@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const crypto = require('crypto');
+const axios = require('axios');
 
 // Bot configuration
 const config = {
@@ -373,10 +374,23 @@ function generatePassword(length = 12) {
     return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-function shortenUrl(url) {
-    // Simple URL shortener using a hash
-    const hash = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
-    return `https://short.ly/${hash}`;
+async function shortenUrl(url) {
+    try {
+        // TinyURL API integration
+        const response = await axios.get(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+        
+        // Check if TinyURL returned a valid shortened URL
+        if (response.data && response.data.startsWith('https://tinyurl.com/')) {
+            return response.data;
+        } else {
+            throw new Error('Invalid response from TinyURL');
+        }
+    } catch (error) {
+        console.error('TinyURL Error:', error.message);
+        // Fallback to local hash-based shortener if TinyURL fails
+        const hash = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
+        return `https://short.ly/${hash}`;
+    }
 }
 
 function getColorInfo(colorName) {
@@ -832,7 +846,7 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         }
                         
                         try {
-                            const shortUrl = shortenUrl(url);
+                            const shortUrl = await shortenUrl(url);
                             const response = `🔗 *URL Shortening Complete!*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -842,15 +856,17 @@ ${url}
 ⚡ *Shortened URL:*
 ${shortUrl}
 
-📊 *Benefits:*
-• 60% shorter length
-• Easy to share
+📊 *Service:* ${shortUrl.includes('tinyurl.com') ? 'TinyURL (Official)' : 'Fallback Service'}
+✨ *Benefits:*
+• ${Math.round((1 - shortUrl.length / url.length) * 100)}% shorter length
+• Easy to share & remember
 • Professional appearance
+• Permanent redirect link
 
-ℹ️ *Note:* Demo shortener for testing
-🔗 *Production:* Use bit.ly or tinyurl`;
+${shortUrl.includes('tinyurl.com') ? '🌐 *Powered by TinyURL*' : '⚠️ *Fallback used - TinyURL unavailable*'}`;
                             
-                            await sock.sendMessage(from, { text: response }, { quoted: msg });
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            await sock.sendMessage(targetJid, { text: response }, { quoted: msg });
                         } catch (e) {
                             console.error('Error shortening URL:', e);
                             await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'shorturl');

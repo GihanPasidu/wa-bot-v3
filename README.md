@@ -1,6 +1,8 @@
-# WhatsApp Bot v3
-
-A feature-rich WhatsApp bot built with Baileys library, offering comprehensive group management, media processing, and advanced utility tools.
+# WhatsApp Bot v3### 🔧 Advanced Tools
+- `.shorturl [url]` — URL shortener powered by TinyURL
+- `.color [name]` — Comprehensive color code lookup (HEX, RGB, HSL)
+- `.time` — Current date, time, timezone, and bot uptime
+- `.pass [length]` — Cryptographically secure password generator feature-rich WhatsApp bot built with Baileys library, offering comprehensive group management, media processing, and advanced utility tools.
 
 ## Features
 
@@ -73,6 +75,7 @@ node bot.js
 - `sharp` - Image processing for stickers
 - `pino` - Logging framework
 - `qrcode-terminal` - QR code display
+- `axios` - HTTP client for TinyURL API
 - `crypto` - Password generation
 
 ## File Structure
@@ -103,7 +106,7 @@ Send sticker with caption: .toimg
 
 ### Advanced Tools
 ```
-.shorturl https://example.com
+.shorturl https://example.com/very/long/url/path
 .color red
 .time
 .pass 16
