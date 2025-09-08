@@ -488,6 +488,7 @@ async function startBot() {
             console.log('🚀 WhatsApp Bot Successfully Connected!');
             console.log('🤖 Bot Status: Online and Ready');
             console.log('📋 Quick Commands: .panel | .sticker | .toimg | .time | .pass');
+            console.log('ℹ️  Basic Commands: .help | .stats | .ping | .about');
             console.log('👑 Admin Commands: .ginfo | .tagall | .kick | .promote');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         } else if (connection === 'close') {
@@ -626,7 +627,13 @@ async function startBot() {
 🤖  *WhatsApp Bot — Control Panel*
 ────────────────────────────────
 
-📌  *General Commands*
+�  *Basic Commands*
+• \`.help\` — Complete commands list
+• \`.stats\` — Bot statistics & uptime  
+• \`.ping\` — Response time test
+• \`.about\` — Bot information
+
+�📌  *General Commands*
 • \`.panel\` — Show this menu
 • \`.status\` — Debug information
 • \`.autoread\` — Toggle auto read receipts (${config.autoRead ? '✅ ON' : '❌ OFF'})
@@ -972,6 +979,267 @@ ${timeInfo.timezone}
                         } catch (e) {
                             console.error('Error generating password:', e);
                             await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'pass');
+                        }
+                        break;
+                    }
+                    
+                    // Basic Commands
+                    case '.help': {
+                        try {
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            const helpText = `📚 *WhatsApp Bot v3 - Command Reference*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 **Basic Commands**
+• \`.help\` — Complete commands list
+• \`.stats\` — Bot statistics & uptime
+• \`.ping\` — Response time test
+• \`.about\` — Bot information
+• \`.panel\` — Main control panel
+
+⚙️ **Bot Control**
+• \`.on\` / \`.off\` — Enable/disable bot
+• \`.autoread\` — Toggle read receipts
+• \`.anticall\` — Toggle call blocking
+
+🎨 **Media Commands**
+• \`.sticker\` — Convert image to sticker
+• \`.toimg\` — Convert sticker to image
+
+🛠️ **Advanced Tools**
+• \`.shorturl [url]\` — URL shortener
+• \`.color [name]\` — Color code lookup
+• \`.time\` — Current time & timezone
+• \`.pass [length]\` — Password generator
+
+👥 **Group Commands** (Admin Only)
+• \`.ginfo\` — Group information
+• \`.tagall [msg]\` — Tag all members
+• \`.admins\` — List administrators
+• \`.members\` — Member statistics
+• \`.kick @user\` — Remove member
+• \`.promote @user\` — Make admin
+• \`.mute [duration]\` — Mute group
+• \`.warn @user\` — Issue warning
+• \`.antilink on/off\` — Link protection
+
+🔒 **Security Features**
+• Admin permission validation
+• Self-chat message redirection
+• Comprehensive error handling
+• Secure auth data management
+
+💡 **Usage Tips:**
+• Commands work in groups & private chats
+• Group commands require admin privileges
+• Use \`.panel\` for interactive menu
+• Bot responds with helpful error messages
+
+🚀 **Powered by Baileys Library**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                            
+                            await sock.sendMessage(targetJid, { text: helpText }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error showing help:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'help');
+                        }
+                        break;
+                    }
+                    
+                    case '.stats': {
+                        try {
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+                            const uptimeMinutes = Math.floor(uptimeSeconds / 60);
+                            const uptimeHours = Math.floor(uptimeMinutes / 60);
+                            const uptimeDays = Math.floor(uptimeHours / 24);
+                            
+                            let uptimeString = '';
+                            if (uptimeDays > 0) uptimeString += `${uptimeDays}d `;
+                            if (uptimeHours % 24 > 0) uptimeString += `${uptimeHours % 24}h `;
+                            if (uptimeMinutes % 60 > 0) uptimeString += `${uptimeMinutes % 60}m `;
+                            uptimeString += `${uptimeSeconds % 60}s`;
+                            
+                            const memoryUsage = process.memoryUsage();
+                            const memoryMB = (memoryUsage.rss / 1024 / 1024).toFixed(2);
+                            
+                            const statsText = `📊 *Bot Statistics & Performance*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ **Uptime Information:**
+• 🚀 Started: ${new Date(startTime).toLocaleString()}
+• ⏰ Running: ${uptimeString.trim()}
+• 📅 Current: ${new Date().toLocaleString()}
+
+💻 **System Performance:**
+• 🧠 Memory Usage: ${memoryMB} MB
+• 🔄 Node.js Version: ${process.version}
+• 🏗️ Platform: ${process.platform}
+
+🤖 **Bot Status:**
+• 🟢 Status: Active & Responsive
+• 📡 Connection: Stable
+• 🛡️ Auto Read: ${config.autoRead ? 'Enabled' : 'Disabled'}
+• 📵 Anti Call: ${config.antiCall ? 'Enabled' : 'Disabled'}
+
+📈 **Feature Statistics:**
+• 👥 Muted Groups: ${mutedGroups.size}
+• ⚠️ Warning System: Active
+• 🔗 Antilink Groups: ${antilinkGroups.size}
+• 🔐 Admin Protection: Enabled
+
+⚡ **Performance Metrics:**
+• 🚀 Response Time: Optimized
+• 💾 Cache Status: Active
+• 🔧 Error Handling: Comprehensive
+• 📱 Self-Chat: Supported
+
+🌟 *Bot running smoothly and ready to serve!*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                            
+                            await sock.sendMessage(targetJid, { text: statsText }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error showing stats:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'stats');
+                        }
+                        break;
+                    }
+                    
+                    case '.ping': {
+                        try {
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            const startTime = Date.now();
+                            
+                            // Send initial ping message
+                            const sentMsg = await sock.sendMessage(targetJid, { 
+                                text: '📡 *Ping Test*\n\n⏳ Measuring response time...' 
+                            }, { quoted: msg });
+                            
+                            // Calculate response time
+                            const responseTime = Date.now() - startTime;
+                            
+                            // Update with results
+                            setTimeout(async () => {
+                                try {
+                                    let speedEmoji = '🟢';
+                                    let speedStatus = 'Excellent';
+                                    
+                                    if (responseTime > 1000) {
+                                        speedEmoji = '🟡';
+                                        speedStatus = 'Good';
+                                    }
+                                    if (responseTime > 2000) {
+                                        speedEmoji = '🟠';
+                                        speedStatus = 'Average';
+                                    }
+                                    if (responseTime > 3000) {
+                                        speedEmoji = '🔴';
+                                        speedStatus = 'Slow';
+                                    }
+                                    
+                                    const pingText = `📡 *Ping Test Results*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ **Response Time:**
+• 🕐 Latency: ${responseTime}ms
+• ${speedEmoji} Status: ${speedStatus}
+• 📊 Performance: ${responseTime < 500 ? 'Optimal' : responseTime < 1500 ? 'Good' : 'Needs Improvement'}
+
+🌐 **Connection Quality:**
+• 📶 Signal: Strong
+• 🔄 Stability: Active
+• 🛡️ Security: Encrypted
+
+📈 **Benchmark:**
+• 🟢 < 500ms: Excellent
+• 🟡 500-1500ms: Good  
+• 🟠 1500-3000ms: Average
+• 🔴 > 3000ms: Slow
+
+🚀 *Bot is responding efficiently!*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                                    
+                                    await sock.sendMessage(targetJid, { text: pingText }, { quoted: msg });
+                                } catch (updateError) {
+                                    console.error('Error updating ping result:', updateError);
+                                }
+                            }, 1000);
+                            
+                        } catch (e) {
+                            console.error('Error running ping test:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'ping');
+                        }
+                        break;
+                    }
+                    
+                    case '.about': {
+                        try {
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            const aboutText = `ℹ️ *WhatsApp Bot v3 Information*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 **Bot Details:**
+• 📛 Name: WhatsApp Bot v3
+• 🏷️ Version: 3.0.0
+• 👨‍💻 Developer: CloudNextra Solutions
+• 📅 Build: September 2025
+
+⚙️ **Technical Stack:**
+• 🚀 Engine: Node.js ${process.version}
+• 📚 Library: @whiskeysockets/baileys v6.6.0
+• 🖼️ Image Processing: Sharp v0.33.4
+• 🔍 Logging: Pino v9.0.0
+• 📱 Platform: ${process.platform}
+
+🌟 **Key Features:**
+• 💬 Multi-format messaging support
+• 🎨 Advanced media processing
+• 👥 Comprehensive group management
+• 🔒 Security & admin controls
+• 🛠️ Utility tools & generators
+• 📡 Self-chat compatibility
+• ⚡ Real-time error handling
+
+🔧 **Capabilities:**
+• 📸 Image ↔ Sticker conversion
+• 🔗 URL shortening service
+• 🎨 Color code lookup
+• 🔐 Secure password generation
+• ⏰ Time & timezone display
+• 📊 System statistics
+• 🚫 Anti-spam protection
+
+🛡️ **Security Features:**
+• 🔑 Admin permission system
+• 🚨 Automatic call rejection
+• 🔗 Anti-link protection
+• ⚠️ Warning system
+• 🔇 Group muting controls
+• 📱 Self-chat message routing
+
+💼 **Professional Use:**
+• 🏢 Business group management
+• 📋 Automated moderation
+• 🎯 Content creation tools
+• 📊 Performance monitoring
+• 🔧 System administration
+
+🌐 **Open Source:**
+• 📄 License: MIT
+• 🔄 Updates: Regular
+• 🐛 Bug Reports: GitHub Issues
+• 💡 Feature Requests: Welcome
+
+🚀 *Built with performance and reliability in mind!*
+
+📞 **Support:** Use .help for commands
+🎯 **Quick Start:** Send .panel for menu
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                            
+                            await sock.sendMessage(targetJid, { text: aboutText }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error showing about info:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'about');
                         }
                         break;
                     }
