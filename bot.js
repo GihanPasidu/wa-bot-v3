@@ -15,7 +15,7 @@ const sharp = require('sharp');
 const config = {
     autoRead: false,
     antiCall: false,
-    adminJids: ['94752735513@s.whatsapp.net'], // E.164 without +, then @s.whatsapp.net
+    adminJids: ['94788006269@s.whatsapp.net'], // E.164 without +, then @s.whatsapp.net
     botEnabled: true
 };
 
@@ -188,6 +188,15 @@ function isImageMessage(msg) {
     return false;
 }
 
+function isStickerMessage(msg) {
+    const m = msg.message || {};
+    if (m.stickerMessage) return true;
+    if (m.ephemeralMessage && m.ephemeralMessage.message?.stickerMessage) return true;
+    if (m.viewOnceMessage && m.viewOnceMessage.message?.stickerMessage) return true;
+    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.stickerMessage) return true;
+    return false;
+}
+
 function extractImageMessage(msg) {
     const m = msg.message || {};
     if (m.imageMessage) return msg;
@@ -199,6 +208,21 @@ function extractImageMessage(msg) {
     }
     if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.imageMessage) {
         return { ...msg, message: { imageMessage: m.viewOnceMessageV2.message.imageMessage } };
+    }
+    return null;
+}
+
+function extractStickerMessage(msg) {
+    const m = msg.message || {};
+    if (m.stickerMessage) return msg;
+    if (m.ephemeralMessage && m.ephemeralMessage.message?.stickerMessage) {
+        return { ...msg, message: { stickerMessage: m.ephemeralMessage.message.stickerMessage } };
+    }
+    if (m.viewOnceMessage && m.viewOnceMessage.message?.stickerMessage) {
+        return { ...msg, message: { stickerMessage: m.viewOnceMessage.message.stickerMessage } };
+    }
+    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.stickerMessage) {
+        return { ...msg, message: { stickerMessage: m.viewOnceMessageV2.message.stickerMessage } };
     }
     return null;
 }
@@ -264,6 +288,12 @@ async function createStickerFromImageBuffer(buffer) {
     return webpBuffer;
 }
 
+async function convertStickerToImage(buffer) {
+    // Convert webp sticker to jpeg using sharp
+    const jpegBuffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+    return jpegBuffer;
+}
+
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
     const { version } = await fetchLatestBaileysVersion();
@@ -286,7 +316,7 @@ async function startBot() {
         }
         if (connection === 'open') {
             console.log('✅ Bot connected and ready.');
-            console.log('📋 Commands: .panel | .sticker | .autoread | .anticall | .on | .off | .ghelp');
+            console.log('📋 Commands: .panel | .sticker | .toimg | .autoread | .anticall | .on | .off | .ghelp');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Connection closed. Reconnect:', shouldReconnect);
@@ -409,10 +439,13 @@ async function startBot() {
 
 📌  *General Commands*
 • \`.panel\` — Show this menu
-• \`.sticker\` — Make a sticker (send an image + caption \`.sticker\` or reply \`.sticker\` to an image)
 • \`.autoread\` — Toggle auto read receipts (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
 • \`.on\` / \`.off\` — Turn bot on/off
+
+🎨  *Media Commands*
+• \`.sticker\` — Convert image to sticker
+• \`.toimg\` — Convert sticker to image
 
 👑  *Group Management* (Admin Only)
 • \`.ginfo\` — Group information
@@ -435,9 +468,10 @@ async function startBot() {
 • Anti Call: ${config.antiCall ? '✅ Enabled' : '❌ Disabled'}
 
 ℹ️  *Tips*
-• For best results, send clear images when creating stickers.
-• Group commands only work if you're an admin in the group.
-• Use \`.ghelp\` in groups to see all group management commands.
+• Send image + \`.sticker\` or reply \`.sticker\` to convert to sticker
+• Send sticker + \`.toimg\` or reply \`.toimg\` to convert to image
+• Group commands only work if you're an admin in the group
+• Use \`.ghelp\` in groups to see all group management commands
 `;
                         await sock.sendMessage(from, { text: panelText }, { quoted: msg });
                         break;
@@ -479,6 +513,38 @@ async function startBot() {
                         } catch (e) {
                             console.error('Error creating sticker:', e);
                             await sock.sendMessage(from, { text: '⚠️ Unable to create sticker. Please try a different image.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    case '.toimg': {
+                        // Check if the triggering message includes a sticker, or check quoted message
+                        let stickerMsg = isStickerMessage(msg) ? extractStickerMessage(msg) : null;
+                        if (!stickerMsg && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                            const quoted = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+                            if (quoted.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.stickerMessage } };
+                            else if (quoted.ephemeralMessage?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.ephemeralMessage.message.stickerMessage } };
+                            else if (quoted.viewOnceMessage?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.viewOnceMessage.message.stickerMessage } };
+                            else if (quoted.viewOnceMessageV2?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.viewOnceMessageV2.message.stickerMessage } };
+                        }
+                        if (!stickerMsg) {
+                            await sock.sendMessage(from, { text: '🎨 Please send a sticker with caption \`.toimg\` or reply \`.toimg\` to an existing sticker.' }, { quoted: msg });
+                            break;
+                        }
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                stickerMsg,
+                                'buffer',
+                                {},
+                                { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+                            );
+                            const jpeg = await convertStickerToImage(buffer);
+                            await sock.sendMessage(from, { 
+                                image: jpeg,
+                                caption: '🖼️ Converted sticker to image!'
+                            }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error converting sticker to image:', e);
+                            await sock.sendMessage(from, { text: '⚠️ Unable to convert sticker to image. Please try a different sticker.' }, { quoted: msg });
                         }
                         break;
                     }
