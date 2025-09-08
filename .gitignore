@@ -1,6 +1,5 @@
 # WhatsApp Bot Authentication Data
 auth/
-*.json
 
 # Node.js dependencies
 node_modules/
