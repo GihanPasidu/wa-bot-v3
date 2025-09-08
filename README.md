@@ -5,20 +5,73 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 ## Features
 
 - 🔐 **QR Code Authentication** - Scan QR code to connect your WhatsApp account
-- 🤖 **Bot Commands** - Multiple commands for account management
+- 🤖 **Rich Command Set** - 25+ commands for various functions
+- 🎲 **Fun Commands** - Jokes, quotes, dice, coin flip, 8-ball, and more
+- 🔧 **Utility Tools** - Calculator, password generator, time, weather info
+- 🎨 **Media Processing** - Create stickers, convert sticker to image
 - 📱 **Auto Status View** - Automatically mark status messages as read
 - 📞 **Call Blocking** - Block incoming calls when enabled
-- 🎨 **Sticker Creation** - Convert images to WhatsApp stickers
-- 🛡️ **Admin Controls** - Secure command access for administrators
+- 👑 **Group Management** - Complete admin tools for group control
+- 📊 **Statistics** - Track bot usage and performance
+- 🛡️ **Security Features** - Anti-link protection, warning system
+- ⚡ **Fast Response** - Built with Baileys for optimal performance
 
 ## Bot Commands
 
+### Quick Commands
 | Command | Description |
 |---------|-------------|
-| `.panel` | Show control panel menu with all available options |
-| `.autoread` | Toggle auto status view (mark status as read automatically) |
-| `.anticall` | Toggle call blocking feature |
-| `.sticker` | Create sticker from image (send image with this command) |
+| `.help` | Complete list of all commands |
+| `.panel` | Main control panel with status |
+| `.ping` | Check bot response time |
+| `.stats` | Bot statistics and uptime |
+| `.about` | Information about the bot |
+
+### Fun Commands
+| Command | Description |
+|---------|-------------|
+| `.quote` | Random inspirational quote |
+| `.joke` | Random joke |
+| `.fact` | Random fun fact |
+| `.dice [sides]` | Roll a dice (default 6 sides) |
+| `.coin` | Flip a coin |
+| `.8ball [question]` | Magic 8-ball answers |
+
+### Utility Commands
+| Command | Description |
+|---------|-------------|
+| `.calc [expression]` | Basic calculator |
+| `.time` | Current date and time |
+| `.pass [length]` | Generate secure password |
+| `.weather [city]` | Weather info (demo) |
+| `.qr [text]` | Generate QR code info |
+
+### Media Commands
+| Command | Description |
+|---------|-------------|
+| `.sticker` | Convert image to WhatsApp sticker |
+| `.toimg` | Convert sticker to image |
+
+### Settings Commands
+| Command | Description |
+|---------|-------------|
+| `.autoread` | Toggle auto status view |
+| `.anticall` | Toggle call blocking |
+| `.on` / `.off` | Enable/disable bot |
+
+### Group Management (Admin Only)
+| Command | Description |
+|---------|-------------|
+| `.ghelp` | Show all group commands |
+| `.ginfo` | Show group information |
+| `.kick @user` | Remove member from group |
+| `.promote @user` | Make member admin |
+| `.demote @user` | Remove admin privileges |
+| `.mute [duration]` | Mute group (e.g., 5m, 1h, 1d) |
+| `.unmute` | Unmute group |
+| `.warn @user` | Issue warning to member |
+| `.lock` / `.unlock` | Lock/unlock group |
+| `.antilink on/off` | Toggle link protection |
 
 ## Installation
 
@@ -59,19 +112,28 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 
 ## Usage Examples
 
-### Control Panel
-Send `.panel` to see all available commands and current status.
+### Quick Start
+Send `.help` to see all available commands or `.panel` for the main control panel.
 
-### Auto Status View
-Send `.autoread` to toggle automatic status viewing on/off.
+### Fun Commands
+- `.joke` - Get a random joke
+- `.quote` - Get inspirational quote
+- `.dice 20` - Roll a 20-sided dice
+- `.8ball Will I be successful?` - Ask the magic 8-ball
 
-### Call Blocking
-Send `.anticall` to toggle call blocking on/off.
+### Utility Commands
+- `.calc 15 * 7 + 3` - Use the calculator
+- `.pass 16` - Generate a 16-character password
+- `.time` - Check current date and time
 
-### Sticker Creation
-1. Send an image to the bot
-2. Add `.sticker` as a caption or send `.sticker` after the image
-3. The bot will convert the image to a WhatsApp sticker
+### Media Commands
+1. **Create Sticker**: Send an image with `.sticker` caption
+2. **Convert Sticker**: Reply to a sticker with `.toimg`
+
+### Group Management
+- `.ginfo` - View group details
+- `.mute 1h` - Mute group for 1 hour
+- `.warn @username` - Issue warning to member
 
 ## Configuration
 
