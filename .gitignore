@@ -1,0 +1,2 @@
+# Ignore authentication/session data
+/auth/
