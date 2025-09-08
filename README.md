@@ -5,8 +5,7 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 ## Features
 
 - 🔐 **QR Code Authentication** - Scan QR code to connect your WhatsApp account
-- 🤖 **Rich Command Set** - 35+ commands for various functions
-- 🎲 **Fun Commands** - Jokes, quotes, dice, coin flip, 8-ball, and more
+- 🤖 **Rich Command Set** - 30+ commands for various functions
 - 🔧 **Utility Tools** - Calculator, password generator, time, weather info
 - 🛠️ **Advanced Tools** - Base64 encoding, hash generation, IP lookup, URL shortening
 - 🎨 **Media Processing** - Create stickers, convert sticker to image
@@ -27,16 +26,6 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 | `.ping` | Check bot response time |
 | `.stats` | Bot statistics and uptime |
 | `.about` | Information about the bot |
-
-### Fun Commands
-| Command | Description |
-|---------|-------------|
-| `.quote` | Random inspirational quote |
-| `.joke` | Random joke |
-| `.fact` | Random fun fact |
-| `.dice [sides]` | Roll a dice (default 6 sides) |
-| `.coin` | Flip a coin |
-| `.8ball [question]` | Magic 8-ball answers |
 
 ### Utility Commands
 | Command | Description |
@@ -132,12 +121,6 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 
 ### Quick Start
 Send `.help` to see all available commands or `.panel` for the main control panel.
-
-### Fun Commands
-- `.joke` - Get a random joke
-- `.quote` - Get inspirational quote
-- `.dice 20` - Roll a 20-sided dice
-- `.8ball Will I be successful?` - Ask the magic 8-ball
 
 ### Utility Commands
 - `.calc 15 * 7 + 3` - Use the calculator

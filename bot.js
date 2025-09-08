@@ -31,48 +31,6 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
-// Quote storage for random quotes
-const quotes = [
-    "The only way to do great work is to love what you do. - Steve Jobs",
-    "Life is what happens to you while you're busy making other plans. - John Lennon",
-    "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-    "It is during our darkest moments that we must focus to see the light. - Aristotle",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
-    "The only impossible journey is the one you never begin. - Tony Robbins",
-    "In the end, we will remember not the words of our enemies, but the silence of our friends. - Martin Luther King Jr.",
-    "Be yourself; everyone else is already taken. - Oscar Wilde",
-    "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe. - Albert Einstein",
-    "Be the change that you wish to see in the world. - Mahatma Gandhi"
-];
-
-// Fun facts storage
-const funFacts = [
-    "🐙 Octopuses have three hearts and blue blood!",
-    "🦒 A giraffe's tongue is about 20 inches long and black to prevent sunburn.",
-    "🐘 Elephants can't jump - they're the only mammals that can't!",
-    "🧠 Your brain uses about 20% of your body's total energy.",
-    "🌙 There are more possible chess games than atoms in the observable universe.",
-    "🐧 Penguins have knees, they're just hidden inside their bodies.",
-    "🍯 Honey never spoils - archaeologists have found edible honey in ancient Egyptian tombs.",
-    "🦋 Butterflies taste with their feet.",
-    "🐋 A blue whale's heart is so large that a human could crawl through its arteries.",
-    "⚡ Lightning strikes the Earth about 100 times per second."
-];
-
-// Joke storage
-const jokes = [
-    "Why don't scientists trust atoms? Because they make up everything! 😄",
-    "I told my wife she was drawing her eyebrows too high. She looked surprised. 😂",
-    "Why don't eggs tell jokes? They'd crack each other up! 🥚",
-    "What do you call a bear with no teeth? A gummy bear! 🐻",
-    "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
-    "What's the best thing about Switzerland? I don't know, but the flag is a big plus! 🇨🇭",
-    "Why don't skeletons fight each other? They don't have the guts! 💀",
-    "What do you call a fake noodle? An impasta! 🍝",
-    "How do you organize a space party? You planet! 🌍",
-    "Why did the coffee file a police report? It got mugged! ☕"
-];
-
 // Bot stats
 const botStats = {
     startTime: Date.now(),
@@ -213,14 +171,6 @@ function generatePassword(length = 12) {
         password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password;
-}
-
-function flipCoin() {
-    return Math.random() < 0.5 ? 'Heads' : 'Tails';
-}
-
-function rollDice(sides = 6) {
-    return Math.floor(Math.random() * sides) + 1;
 }
 
 async function getWeatherInfo(city) {
@@ -386,7 +336,7 @@ async function startBot() {
         }
         if (connection === 'open') {
             console.log('✅ Bot connected and ready.');
-            console.log('📋 Quick Commands: .help | .panel | .sticker | .joke | .quote | .dice | .ping');
+            console.log('📋 Quick Commands: .help | .panel | .sticker | .calc | .time | .ping');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Connection closed. Reconnect:', shouldReconnect);
@@ -523,14 +473,6 @@ async function startBot() {
 • \`.sticker\` — Convert image to sticker
 • \`.toimg\` — Convert sticker to image
 
-🎲 *Fun Commands*
-• \`.quote\` — Inspirational quotes
-• \`.joke\` — Random jokes
-• \`.fact\` — Amazing fun facts
-• \`.dice [6]\` — Roll dice (custom sides)
-• \`.coin\` — Flip a coin
-• \`.8ball [question]\` — Magic 8-ball
-
 🔧 *Utility Commands*
 • \`.calc [2+2]\` — Calculator
 • \`.time\` — Current time & date
@@ -598,14 +540,6 @@ async function startBot() {
 • \`.sticker\` — Convert image to sticker
 • \`.toimg\` — Convert sticker back to image
 
-🎲 *Fun & Entertainment*
-• \`.quote\` — Random inspirational quotes
-• \`.joke\` — Random jokes to brighten your day
-• \`.fact\` — Amazing fun facts
-• \`.dice [sides]\` — Roll dice (1-100 sides, default 6)
-• \`.coin\` — Flip a coin (heads or tails)
-• \`.8ball [question]\` — Ask the magic 8-ball
-
 🔧 *Utility Tools*
 • \`.calc [expression]\` — Mathematical calculator
 • \`.time\` — Current date, time & timezone
@@ -662,10 +596,10 @@ async function startBot() {
 • Group commands require admin privileges
 
 🚀 *Quick Examples:*
-• \`.dice 20\` — Roll 20-sided dice
 • \`.calc 15 * 7 + 3\` — Calculate math
 • \`.pass 16\` — Generate 16-char password
-• \`.8ball Will I pass the exam?\` — Ask question
+• \`.base64 encode Hello\` — Encode text
+• \`.hash mypassword\` — Generate hashes
 
 🔗 *Bot Version:* 3.0 | Built with Baileys
 `;
@@ -733,38 +667,6 @@ Type \`.help\` for all commands!
                         await sock.sendMessage(from, { text: aboutText }, { quoted: msg });
                         break;
                     }
-                    case '.quote': {
-                        const quote = getRandomElement(quotes);
-                        await sock.sendMessage(from, { text: `💭 *Daily Inspiration*\n\n"${quote}"` }, { quoted: msg });
-                        break;
-                    }
-                    case '.joke': {
-                        const joke = getRandomElement(jokes);
-                        await sock.sendMessage(from, { text: `😂 *Random Joke*\n\n${joke}` }, { quoted: msg });
-                        break;
-                    }
-                    case '.fact': {
-                        const fact = getRandomElement(funFacts);
-                        await sock.sendMessage(from, { text: `🧠 *Fun Fact*\n\n${fact}` }, { quoted: msg });
-                        break;
-                    }
-                    case '.dice': {
-                        const args = fullCommand.split(' ');
-                        const sides = args[1] ? parseInt(args[1]) : 6;
-                        if (sides < 2 || sides > 100) {
-                            await sock.sendMessage(from, { text: '❌ Please use between 2-100 sides.' }, { quoted: msg });
-                            break;
-                        }
-                        const result = rollDice(sides);
-                        await sock.sendMessage(from, { text: `🎲 *Dice Roll (${sides}-sided)*\n\n🎯 Result: **${result}**` }, { quoted: msg });
-                        break;
-                    }
-                    case '.coin': {
-                        const result = flipCoin();
-                        const emoji = result === 'Heads' ? '🪙' : '⚪';
-                        await sock.sendMessage(from, { text: `${emoji} *Coin Flip*\n\n🎯 Result: **${result}**` }, { quoted: msg });
-                        break;
-                    }
                     case '.pass': {
                         const args = fullCommand.split(' ');
                         const length = args[1] ? parseInt(args[1]) : 12;
@@ -774,37 +676,6 @@ Type \`.help\` for all commands!
                         }
                         const password = generatePassword(length);
                         await sock.sendMessage(from, { text: `🔐 *Generated Password*\n\n\`${password}\`\n\n⚠️ *Security Tip:* Save this password securely and don't share it!` }, { quoted: msg });
-                        break;
-                    }
-                    case '.8ball': {
-                        const question = fullCommand.replace('.8ball', '').trim();
-                        if (!question) {
-                            await sock.sendMessage(from, { text: '❌ Please ask a question. Usage: `.8ball Will it rain today?`' }, { quoted: msg });
-                            break;
-                        }
-                        const responses = [
-                            "🔮 It is certain",
-                            "🔮 Without a doubt",
-                            "🔮 Yes definitely",
-                            "🔮 You may rely on it",
-                            "🔮 As I see it, yes",
-                            "🔮 Most likely",
-                            "🔮 Outlook good",
-                            "🔮 Yes",
-                            "🔮 Signs point to yes",
-                            "🔮 Reply hazy, try again",
-                            "🔮 Ask again later",
-                            "🔮 Better not tell you now",
-                            "🔮 Cannot predict now",
-                            "🔮 Concentrate and ask again",
-                            "🔮 Don't count on it",
-                            "🔮 My reply is no",
-                            "🔮 My sources say no",
-                            "🔮 Outlook not so good",
-                            "🔮 Very doubtful"
-                        ];
-                        const answer = getRandomElement(responses);
-                        await sock.sendMessage(from, { text: `🎱 *Magic 8-Ball*\n\n❓ *Question:* ${question}\n\n${answer}` }, { quoted: msg });
                         break;
                     }
                     case '.calc': {
