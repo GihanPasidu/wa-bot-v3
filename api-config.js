@@ -7,7 +7,7 @@ require('dotenv').config();
 const config = {
     // 🤖 Bot Configuration
     bot: {
-        adminJids: [process.env.ADMIN_PHONE ? `${process.env.ADMIN_PHONE}@s.whatsapp.net` : '94752735513@s.whatsapp.net'],
+        adminJids: [process.env.ADMIN_PHONE ? `${process.env.ADMIN_PHONE}@s.whatsapp.net` : '94788006269@s.whatsapp.net'],
         autoRead: process.env.AUTO_READ === 'true',
         antiCall: process.env.ANTI_CALL === 'true',
         botEnabled: process.env.BOT_ENABLED !== 'false',
