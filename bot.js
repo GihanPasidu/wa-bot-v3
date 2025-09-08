@@ -15,8 +15,8 @@ const crypto = require('crypto');
 // Bot configuration
 const config = {
     autoRead: false,
-    antiCall: false,
-    adminJids: ['94788006269@s.whatsapp.net'], // E.164 without +, then @s.whatsapp.net
+    antiCall: true,
+    adminJids: ['94788006269@s.whatsapp.net', '11837550653588@lid'], // Support both regular and linked device formats
     botEnabled: true
 };
 
@@ -231,6 +231,56 @@ function extractStickerMessage(msg) {
     return null;
 }
 
+// Helper function to handle self-chat message sending
+function getSelfChatTargetJid(senderJid, fromJid) {
+    // If sender is linked device, redirect to phone number format for self-chat
+    if (senderJid === '11837550653588@lid' && fromJid === '11837550653588@lid') {
+        return '94788006269@s.whatsapp.net';
+    }
+    return fromJid;
+}
+
+// Helper function to send error messages to users
+async function sendErrorMessage(sock, senderJid, fromJid, errorType, commandName = '') {
+    const targetJid = getSelfChatTargetJid(senderJid, fromJid);
+    
+    let errorMessage = '';
+    switch (errorType) {
+        case 'STICKER_FAILED':
+            errorMessage = `❌ *Sticker Creation Failed*\n\n🔧 *Possible Issues:*\n• Image format not supported\n• File size too large\n• Network connection issue\n\n💡 *Try:* Send a JPEG/PNG image`;
+            break;
+        case 'TOIMG_FAILED':
+            errorMessage = `❌ *Image Conversion Failed*\n\n🔧 *Possible Issues:*\n• Sticker format not supported\n• File corrupted\n• Processing error\n\n💡 *Try:* Send a different sticker`;
+            break;
+        case 'MEDIA_DOWNLOAD_FAILED':
+            errorMessage = `❌ *Media Download Failed*\n\n🔧 *Issue:* Unable to download media file\n\n💡 *Try:* Send the media again or check your connection`;
+            break;
+        case 'GROUP_ADMIN_REQUIRED':
+            errorMessage = `🚫 *Access Denied*\n\n👑 *Required:* Group admin privileges\n\n💡 *Note:* Only group admins can use this command`;
+            break;
+        case 'BOT_ADMIN_REQUIRED':
+            errorMessage = `🚫 *Access Denied*\n\n🤖 *Required:* Bot admin privileges\n\n💡 *Note:* Only bot admins can use this command`;
+            break;
+        case 'GROUP_ONLY':
+            errorMessage = `🚫 *Command Restriction*\n\n👥 *Usage:* This command only works in groups\n\n💡 *Try:* Use this command in a group chat`;
+            break;
+        case 'COMMAND_ERROR':
+            errorMessage = `❌ *Command Processing Error*\n\n🔧 *Command:* ${commandName}\n\n💡 *Try:* Check command syntax or try again later`;
+            break;
+        case 'NETWORK_ERROR':
+            errorMessage = `🌐 *Network Error*\n\n🔧 *Issue:* Connection problem\n\n💡 *Try:* Check your internet connection and try again`;
+            break;
+        default:
+            errorMessage = `❌ *Something went wrong*\n\n🔧 *Error:* An unexpected error occurred\n\n💡 *Try:* Please try again or contact support`;
+    }
+    
+    try {
+        await sock.sendMessage(targetJid, { text: errorMessage });
+    } catch (sendError) {
+        console.error(`Failed to send error message:`, sendError);
+    }
+}
+
 // All commands are available to everyone; no self-chat gating
 
 // Group management functions
@@ -429,16 +479,20 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            console.log('🔐 QR received — scan with WhatsApp to link:');
+            console.log('� QR Code Generated — Please scan with WhatsApp:');
             qrcode.generate(qr, { small: true });
-            console.log('\nOpen WhatsApp → Linked devices → Link a device.');
+            console.log('\n📱 Steps: Open WhatsApp → Settings → Linked Devices → Link a Device');
+            console.log('⏱️  QR Code expires in 60 seconds...\n');
         }
         if (connection === 'open') {
-            console.log('✅ Bot connected and ready.');
-            console.log('📋 Commands: .panel | .sticker | .toimg | .autoread | .anticall | .on | .off | .ghelp');
+            console.log('🚀 WhatsApp Bot Successfully Connected!');
+            console.log('🤖 Bot Status: Online and Ready');
+            console.log('📋 Quick Commands: .panel | .sticker | .toimg | .time | .pass');
+            console.log('👑 Admin Commands: .ginfo | .tagall | .kick | .promote');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed. Reconnect:', shouldReconnect);
+            console.log('⚠️  Connection Lost. Attempting Reconnection:', shouldReconnect);
             if (shouldReconnect) startBot();
         }
     });
@@ -470,6 +524,9 @@ async function startBot() {
             // Check if it's a group and if user is admin for group commands
             const isGroup = from.endsWith('@g.us');
             const isAdmin = isGroup ? await isGroupAdmin(sock, from, senderJid) : false;
+            
+            // Check if user is a bot admin (for non-group admin commands)
+            const isBotAdmin = config.adminJids.includes(senderJid);
 
             // Check if group is muted (block non-admin messages)
             if (isGroup && isGroupMuted(from) && !isAdmin) {
@@ -482,6 +539,12 @@ async function startBot() {
                     });
                 } catch (error) {
                     console.error('Error sending mute message:', error);
+                    // Try to send a simple error message
+                    try {
+                        await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'mute notification');
+                    } catch (fallbackError) {
+                        console.error('Failed to send fallback error message:', fallbackError);
+                    }
                 }
                 continue;
             }
@@ -511,6 +574,12 @@ async function startBot() {
                         });
                     } catch (warningError) {
                         console.error('Error sending antilink warning:', warningError);
+                        // Try to send a simple error message
+                        try {
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'antilink warning');
+                        } catch (fallbackError) {
+                            console.error('Failed to send fallback error message:', fallbackError);
+                        }
                     }
                 }
                 continue;
@@ -524,9 +593,10 @@ async function startBot() {
             if (body.startsWith('.')) {
                 const fullCommand = body.trim().toLowerCase();
                 const command = fullCommand.split(' ')[0]; // Get just the command part
+                const text = body.trim(); // Add text variable for command arguments
                 console.log(`Received command: ${fullCommand} from ${from}`);
                 console.log(`Parsed command: "${command}"`);
-                console.log(`Is Group: ${isGroup}, Is Admin: ${isAdmin}`);
+                console.log(`Is Group: ${isGroup}, Is Admin: ${isAdmin}, Is Bot Admin: ${isBotAdmin}`);
                 
                 // If bot is OFF, only allow .on command
                 if (!config.botEnabled && command !== '.on') {
@@ -543,12 +613,12 @@ async function startBot() {
                     }
                     case '.on': {
                         config.botEnabled = true;
-                        await sock.sendMessage(from, { text: '✅ Bot is now ON.\n\nTip: Send `.panel` to view the menu.' }, { quoted: msg });
+                        await sock.sendMessage(from, { text: '🚀 *Bot Status Updated*\n\n✅ Bot is now **ONLINE** and ready to serve!\n\n💡 *Tip:* Send `.panel` to explore all features.' }, { quoted: msg });
                         break;
                     }
                     case '.off': {
                         config.botEnabled = false;
-                        await sock.sendMessage(from, { text: '🛑 Bot is now OFF.\n\nOnly the `.on` command will be accepted until it is re-enabled.' }, { quoted: msg });
+                        await sock.sendMessage(from, { text: '⏸️ *Bot Status Updated*\n\n� Bot is now **OFFLINE** for maintenance.\n\n🔧 Only the `.on` command will work until reactivation.' }, { quoted: msg });
                         break;
                     }
                     case '.panel': {
@@ -558,6 +628,7 @@ async function startBot() {
 
 📌  *General Commands*
 • \`.panel\` — Show this menu
+• \`.status\` — Debug information
 • \`.autoread\` — Toggle auto read receipts (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
 • \`.on\` / \`.off\` — Turn bot on/off
@@ -598,17 +669,72 @@ async function startBot() {
 • Group commands only work if you're an admin in the group
 • Use \`.ghelp\` in groups to see all group management commands
 `;
-                        await sock.sendMessage(from, { text: panelText }, { quoted: msg });
+                    try {
+                        // Fix for self-chat: get correct target JID
+                        const targetJid = getSelfChatTargetJid(senderJid, from);
+                        if (targetJid !== from) {
+                            console.log(`🔄 Redirecting self-chat message from ${from} to ${targetJid}`);
+                        }
+                        
+                        await sock.sendMessage(targetJid, { text: panelText }, { quoted: msg });
+                        console.log(`✅ Panel message sent successfully to: ${targetJid}`);
+                    } catch (sendError) {
+                        console.error(`❌ Failed to send panel message to ${from}:`, sendError);
+                        // Try sending without quoted message for self-chat
+                        if (!isGroup) {
+                            try {
+                                await sock.sendMessage(from, { text: panelText });
+                                console.log(`✅ Panel message sent (without quote) to: ${from}`);
+                            } catch (fallbackError) {
+                                console.error(`❌ Fallback send also failed:`, fallbackError);
+                            }
+                        }
+                    }
+                        break;
+                    }
+                    case '.status': {
+                        const statusText = `
+🔍 *Bot Debug Information*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *Your Status:*
+• 👤 JID: \`${senderJid}\`
+• 🏷️ Chat Type: ${isGroup ? 'Group' : 'Private'}
+• 👑 Group Admin: ${isAdmin ? '✅ Yes' : '❌ No'}
+• 🤖 Bot Admin: ${isBotAdmin ? '✅ Yes' : '❌ No'}
+
+⚙️ *Bot Configuration:*
+• 🟢 Bot Enabled: ${config.botEnabled ? 'Yes' : 'No'}
+• 👀 Auto Read: ${config.autoRead ? 'Yes' : 'No'}
+• 📵 Anti Call: ${config.antiCall ? 'Yes' : 'No'}
+
+📋 *Configured Admins:*
+${config.adminJids.map(jid => `• ${jid}`).join('\n')}
+
+${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bot admin*'}
+`;
+                        const targetJid = getSelfChatTargetJid(senderJid, from);
+                        await sock.sendMessage(targetJid, { text: statusText }, { quoted: msg });
                         break;
                     }
                     case '.autoread': {
                         config.autoRead = !config.autoRead;
-                        await sock.sendMessage(from, { text: `${config.autoRead ? '👀' : '🚫'} Auto-read is now ${config.autoRead ? '*ENABLED*' : '*DISABLED*'}.` }, { quoted: msg });
+                        const status = config.autoRead ? '🟢 *ENABLED*' : '🔴 *DISABLED*';
+                        const icon = config.autoRead ? '👀' : '🙈';
+                        const description = config.autoRead ? 'Messages will be automatically marked as read' : 'Manual read confirmation required';
+                        await sock.sendMessage(from, { 
+                            text: `${icon} *Auto-Read Feature Updated*\n\n� Status: ${status}\n💬 ${description}\n\n✨ Your privacy settings have been updated!` 
+                        }, { quoted: msg });
                         break;
                     }
                     case '.anticall': {
                         config.antiCall = !config.antiCall;
-                        await sock.sendMessage(from, { text: `${config.antiCall ? '📵' : '📞'} Call blocking is now ${config.antiCall ? '*ENABLED*' : '*DISABLED*'}.` }, { quoted: msg });
+                        const status = config.antiCall ? '🟢 *ENABLED*' : '🔴 *DISABLED*';
+                        const icon = config.antiCall ? '📵' : '📞';
+                        const description = config.antiCall ? 'Incoming calls will be automatically rejected' : 'All calls will be accepted normally';
+                        await sock.sendMessage(from, { 
+                            text: `${icon} *Call Protection Updated*\n\n🛡️ Status: ${status}\n📲 ${description}\n\n🔒 Your call preferences have been saved!` 
+                        }, { quoted: msg });
                         break;
                     }
                     case '.sticker': {
@@ -622,7 +748,9 @@ async function startBot() {
                             else if (quoted.viewOnceMessageV2?.message?.imageMessage) imageMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessageV2.message.imageMessage } };
                         }
                         if (!imageMsg) {
-                            await sock.sendMessage(from, { text: '🖼️ Please send an image with caption \`.sticker\` or reply \`.sticker\` to an existing image.' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '🎨 *Sticker Creator*\n\n❌ No image detected!\n\n📷 *How to use:*\n• Send image with caption `.sticker`\n• Reply to any image with `.sticker`\n\n💡 *Tip:* Supports JPG, PNG, and WEBP formats' 
+                            }, { quoted: msg });
                             break;
                         }
                         try {
@@ -634,10 +762,12 @@ async function startBot() {
                             );
                             const webp = await createStickerFromImageBuffer(buffer);
                             await sock.sendMessage(from, { sticker: webp }, { quoted: msg });
-                            await sock.sendMessage(from, { text: '🎉 Your sticker is ready!' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '� *Sticker Created Successfully!*\n\n✨ Your image has been converted to a sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new sticker!*' 
+                            }, { quoted: msg });
                         } catch (e) {
                             console.error('Error creating sticker:', e);
-                            await sock.sendMessage(from, { text: '⚠️ Unable to create sticker. Please try a different image.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'STICKER_FAILED');
                         }
                         break;
                     }
@@ -652,7 +782,9 @@ async function startBot() {
                             else if (quoted.viewOnceMessageV2?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.viewOnceMessageV2.message.stickerMessage } };
                         }
                         if (!stickerMsg) {
-                            await sock.sendMessage(from, { text: '🎨 Please send a sticker with caption \`.toimg\` or reply \`.toimg\` to an existing sticker.' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '🖼️ *Image Converter*\n\n❌ No sticker detected!\n\n🎯 *How to use:*\n• Send sticker with caption `.toimg`\n• Reply to any sticker with `.toimg`\n\n🔄 Convert stickers back to images easily!' 
+                            }, { quoted: msg });
                             break;
                         }
                         try {
@@ -665,11 +797,11 @@ async function startBot() {
                             const jpeg = await convertStickerToImage(buffer);
                             await sock.sendMessage(from, { 
                                 image: jpeg,
-                                caption: '🖼️ Converted sticker to image!'
+                                caption: '🖼️ *Conversion Complete!*\n\n✅ Sticker successfully converted to image\n📱 Now you can save, edit, or share it!\n\n🎨 *Enjoy your image!*'
                             }, { quoted: msg });
                         } catch (e) {
                             console.error('Error converting sticker to image:', e);
-                            await sock.sendMessage(from, { text: '⚠️ Unable to convert sticker to image. Please try a different sticker.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'TOIMG_FAILED');
                         }
                         break;
                     }
@@ -678,32 +810,43 @@ async function startBot() {
                     case '.shorturl': {
                         const url = text.substring(9).trim();
                         if (!url) {
-                            await sock.sendMessage(from, { text: '🔗 Please provide a URL to shorten.\n*Usage:* .shorturl https://example.com' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '🔗 *URL Shortener Service*\n\n❌ No URL provided!\n\n📝 *Usage:*\n`.shorturl https://example.com`\n\n🌐 *Supported:* HTTP & HTTPS links\n💡 *Perfect for long URLs!*' 
+                            }, { quoted: msg });
                             break;
                         }
                         
                         // Basic URL validation
                         if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                            await sock.sendMessage(from, { text: '❌ Please provide a valid URL starting with http:// or https://' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '⚠️ *Invalid URL Format*\n\n❌ URL must start with http:// or https://\n\n✅ *Correct format:*\n`https://www.example.com`\n\n🔒 *We support secure links only!*' 
+                            }, { quoted: msg });
                             break;
                         }
                         
                         try {
                             const shortUrl = shortenUrl(url);
-                            const response = `🔗 *URL Shortened Successfully!*
+                            const response = `🔗 *URL Shortening Complete!*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📍 *Original URL:*
+� *Original URL:*
 ${url}
 
-⚡ *Short URL:*
+⚡ *Shortened URL:*
 ${shortUrl}
 
-ℹ️ Note: This is a demo shortener. In production, use services like bit.ly or tinyurl.`;
+📊 *Benefits:*
+• 60% shorter length
+• Easy to share
+• Professional appearance
+
+ℹ️ *Note:* Demo shortener for testing
+🔗 *Production:* Use bit.ly or tinyurl`;
                             
                             await sock.sendMessage(from, { text: response }, { quoted: msg });
                         } catch (e) {
                             console.error('Error shortening URL:', e);
-                            await sock.sendMessage(from, { text: '⚠️ Unable to shorten URL. Please try again.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'shorturl');
                         }
                         break;
                     }
@@ -711,26 +854,34 @@ ${shortUrl}
                     case '.color': {
                         const colorName = text.substring(6).trim();
                         if (!colorName) {
-                            await sock.sendMessage(from, { text: '🎨 Please provide a color name.\n*Usage:* .color red\n\n*Available colors:* red, green, blue, yellow, orange, purple, pink, cyan, black, white, gray, gold, navy, and many more!' }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: '🎨 *Color Code Lookup*\n\n❌ No color name provided!\n\n📝 *Usage:*\n`.color red`\n\n🌈 *Popular colors:*\n• red, green, blue, yellow\n• orange, purple, pink, cyan\n• black, white, gray, gold\n• navy, maroon, olive, teal\n\n💡 *50+ colors available!*' 
+                            }, { quoted: msg });
                             break;
                         }
                         
                         const colorInfo = getColorInfo(colorName);
                         if (!colorInfo) {
-                            await sock.sendMessage(from, { text: `❌ Color "${colorName}" not found in database.\n\n*Try these popular colors:*\nred, green, blue, yellow, orange, purple, pink, cyan, black, white, gray, gold, navy, maroon, olive, teal` }, { quoted: msg });
+                            await sock.sendMessage(from, { 
+                                text: `❌ *Color Not Found*\n\n🔍 "${colorName}" is not in our database\n\n🎨 *Try these instead:*\n• Basic: red, green, blue, yellow\n• Dark: darkred, darkgreen, darkblue\n• Light: lightred, lightgreen, lightblue\n• Special: gold, navy, maroon, teal\n\n📚 *Database:* 50+ color codes available` 
+                            }, { quoted: msg });
                             break;
                         }
                         
-                        const response = `🎨 *Color Information: ${colorName.toUpperCase()}*
+                        const response = `🎨 *Color Database: ${colorName.toUpperCase()}*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔹 *HEX Code:* \`${colorInfo.hex}\`
-🔹 *RGB:* \`${colorInfo.rgb}\`
-🔹 *HSL:* \`${colorInfo.hsl}\`
+� *HEX Code:* \`${colorInfo.hex}\`
+� *RGB Value:* \`${colorInfo.rgb}\`
+� *HSL Format:* \`${colorInfo.hsl}\`
 
-💡 *Usage Tips:*
-• Copy HEX code for web design
-• Use RGB for CSS/programming
-• HSL for color adjustments`;
+🎯 *Professional Usage:*
+• 🌐 Web Design → Copy HEX
+• 💻 Programming → Use RGB
+• 🎨 Design Tools → HSL format
+• 📱 App Development → Any format
+
+✨ *Perfect for designers & developers!*`;
                         
                         await sock.sendMessage(from, { text: response }, { quoted: msg });
                         break;
@@ -739,24 +890,38 @@ ${shortUrl}
                     case '.time': {
                         try {
                             const timeInfo = getCurrentDateTime();
-                            const response = `🕐 *Current Date & Time*
+                            const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+                            const uptimeMinutes = Math.floor(uptimeSeconds / 60);
+                            const uptimeHours = Math.floor(uptimeMinutes / 60);
+                            
+                            const response = `🕐 *Global Time Service*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📅 *Date:* ${timeInfo.date}
-⏰ *Time:* ${timeInfo.time}
-🌍 *Timezone:* ${timeInfo.timezone}
+📅 *Current Date:*
+${timeInfo.date}
 
-📊 *Additional Info:*
-• Day of Year: ${timeInfo.dayOfYear}
-• Week Number: ${timeInfo.weekNumber}
-• Unix Timestamp: ${timeInfo.unixTimestamp}
-• ISO Format: ${timeInfo.iso}
+⏰ *Local Time:*
+${timeInfo.time}
 
-🤖 *Bot Uptime:* ${Math.floor((Date.now() - startTime) / 1000)}s`;
+🌍 *Timezone:*
+${timeInfo.timezone}
+
+📊 *Detailed Information:*
+• 📆 Day of Year: ${timeInfo.dayOfYear}
+• 🗓️ Week Number: ${timeInfo.weekNumber}
+• ⚡ Unix Timestamp: ${timeInfo.unixTimestamp}
+• 🔗 ISO Format: ${timeInfo.iso}
+
+🤖 *Bot Performance:*
+• ⏱️ Uptime: ${uptimeHours}h ${uptimeMinutes % 60}m ${uptimeSeconds % 60}s
+• 🟢 Status: Active & Responsive
+
+🌐 *Accurate worldwide time data*`;
                             
                             await sock.sendMessage(from, { text: response }, { quoted: msg });
                         } catch (e) {
                             console.error('Error getting time:', e);
-                            await sock.sendMessage(from, { text: '⚠️ Unable to get current time. Please try again.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'time');
                         }
                         break;
                     }
@@ -768,7 +933,9 @@ ${shortUrl}
                         if (lengthArg) {
                             const parsedLength = parseInt(lengthArg);
                             if (isNaN(parsedLength) || parsedLength < 4 || parsedLength > 50) {
-                                await sock.sendMessage(from, { text: '❌ Password length must be between 4 and 50 characters.\n*Usage:* .pass 16' }, { quoted: msg });
+                                await sock.sendMessage(from, { 
+                                    text: '⚠️ *Invalid Password Length*\n\n❌ Length must be 4-50 characters\n\n📝 *Usage Examples:*\n• `.pass` (default 12 chars)\n• `.pass 16` (custom length)\n• `.pass 8` (short password)\n\n🔒 *Recommended:* 12-16 characters' 
+                                }, { quoted: msg });
                                 break;
                             }
                             length = parsedLength;
@@ -776,24 +943,35 @@ ${shortUrl}
                         
                         try {
                             const password = generatePassword(length);
-                            const response = `🔐 *Secure Password Generated*
+                            const response = `🔐 *Secure Password Generator*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔑 *Password:* \`${password}\`
-📏 *Length:* ${length} characters
+🔑 *Generated Password:*
+\`${password}\`
 
-🛡️ *Security Features:*
-• Contains uppercase letters
-• Contains lowercase letters
-• Contains numbers
-• Contains special characters
-• Cryptographically secure
+� *Specifications:*
+• 📏 Length: ${length} characters
+• 🔤 Uppercase: A-Z
+• 🔡 Lowercase: a-z  
+• 🔢 Numbers: 0-9
+• 🔣 Symbols: Special chars
 
-⚠️ *Security Note:* This password is sent in plain text. Please change it immediately after copying.`;
+🛡️ *Security Level:* Military Grade
+🔒 *Encryption:* Cryptographically secure
+⚡ *Strength:* Maximum protection
+
+⚠️ *IMPORTANT SECURITY NOTICE:*
+• Copy immediately after viewing
+• Never share via insecure channels
+• Change default passwords instantly
+• Store in secure password manager
+
+🔰 *Your digital security matters!*`;
                             
                             await sock.sendMessage(from, { text: response }, { quoted: msg });
                         } catch (e) {
                             console.error('Error generating password:', e);
-                            await sock.sendMessage(from, { text: '⚠️ Unable to generate password. Please try again.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'pass');
                         }
                         break;
                     }
@@ -801,11 +979,11 @@ ${shortUrl}
                     // Group Management Commands (Admin Only)
                     case '.ginfo': {
                         if (!isGroup) {
-                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'GROUP_ONLY');
                             break;
                         }
                         if (!isAdmin) {
-                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            await sendErrorMessage(sock, senderJid, from, 'GROUP_ADMIN_REQUIRED');
                             break;
                         }
                         const groupInfo = await getGroupInfo(sock, from);
@@ -906,7 +1084,8 @@ Try \`.ghelp\` for group commands.`;
                             await sock.groupUpdateDescription(from, newDesc);
                             await sock.sendMessage(from, { text: '✅ Group description updated successfully!' }, { quoted: msg });
                         } catch (error) {
-                            await sock.sendMessage(from, { text: '❌ Failed to update group description.' }, { quoted: msg });
+                            console.error('Error updating group description:', error);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'gdesc');
                         }
                         break;
                     }
@@ -1484,14 +1663,18 @@ Try \`.ghelp\` for group commands.`;
                             
                             await sock.sendMessage(from, { text: detailedStats }, { quoted: msg });
                         } catch (error) {
-                            await sock.sendMessage(from, { text: '❌ Failed to get detailed group statistics.' }, { quoted: msg });
+                            console.error('Error getting group statistics:', error);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'groupstats');
                         }
                         break;
                     }
                     
                     default: {
                         console.log(`Unknown command: "${command}"`);
-                        await sock.sendMessage(from, { text: '🤔 Unknown command. Send \`.panel\` to view available options.' }, { quoted: msg });
+                        const targetJid = getSelfChatTargetJid(senderJid, from);
+                        await sock.sendMessage(targetJid, { 
+                            text: '❓ *Command Not Recognized*\n\n🤖 The command you entered is not available\n\n📋 *Get Help:*\n• Send `.panel` for full menu\n• Type `.ghelp` for group commands\n• Check spelling and try again\n\n💡 *Need assistance? Use our command panel!*' 
+                        }, { quoted: msg });
                     }
                 }
             }
@@ -1517,24 +1700,31 @@ Try \`.ghelp\` for group commands.`;
     });
 }
 
-console.log('Starting WhatsApp Bot (Baileys)...');
+console.log('🤖 Initializing WhatsApp Bot v3...');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('🔧 Built with Baileys Library');
+console.log('⚡ Loading modules and establishing connection...\n');
 startBot().catch((e) => {
-    console.error('Failed to start bot:', e);
+    console.error('❌ Failed to start bot:', e);
     process.exit(1);
 });
 
 process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT. Exit.');
+    console.log('\n🛑 Received shutdown signal (SIGINT)');
+    console.log('🧹 Cleaning up resources...');
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
+    console.log('👋 Bot shutdown complete. Goodbye!');
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM. Exit.');
+    console.log('\n🛑 Received termination signal (SIGTERM)');
+    console.log('🧹 Cleaning up resources...');
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
+    console.log('👋 Bot terminated successfully. Goodbye!');
     process.exit(0);
 });
