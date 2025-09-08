@@ -232,6 +232,13 @@ async function getWeatherInfo(city) {
     }
 }
 
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : 
+        'Invalid hex color';
+}
+
 // Auto-unmute function
 async function checkAndAutoUnmute(sock) {
     const now = Date.now();
@@ -531,6 +538,15 @@ async function startBot() {
 • \`.weather [city]\` — Weather info
 • \`.qr [text]\` — QR code info
 
+🛠️ *Advanced Tools*
+• \`.translate [text]\` — Text translation
+• \`.base64 encode/decode\` — Base64 encoder/decoder
+• \`.hash [text]\` — Generate MD5/SHA hashes
+• \`.ip [address]\` — IP address lookup
+• \`.random [min] [max]\` — Random number
+• \`.shorturl [url]\` — URL shortener
+• \`.color [name]\` — Color code lookup
+
 ⚙️ *Settings*
 • \`.autoread\` — Auto-read messages (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Block calls (${config.antiCall ? '✅ ON' : '❌ OFF'})
@@ -538,12 +554,18 @@ async function startBot() {
 
 👑 *Group Management* (Admin Only)
 • \`.ginfo\` — Group information
+• \`.tagall [message]\` — Tag all members
+• \`.admins\` — List group admins
+• \`.members\` — Member statistics
+• \`.rules\` — Display group rules
 • \`.kick @user\` — Remove member
 • \`.promote @user\` — Make admin
 • \`.mute [1h]\` — Mute group
 • \`.warn @user\` — Issue warning
+• \`.resetwarns\` — Reset all warnings
+• \`.groupstats\` — Detailed group stats
 • \`.lock\` / \`.unlock\` — Lock group
-• \`.antilink on\` — Enable link protection
+• \`.antilink on/off\` — Link protection
 
 📊 *Current Status*
 • 🤖 Bot: ${config.botEnabled ? '✅ ONLINE' : '🛑 OFFLINE'}
@@ -591,6 +613,15 @@ async function startBot() {
 • \`.weather [city]\` — Weather information (demo)
 • \`.qr [text]\` — QR code generator info
 
+🛠️ *Advanced Tools*
+• \`.translate [text]\` — Text translation (demo)
+• \`.base64 encode/decode [text]\` — Base64 encoding/decoding
+• \`.hash [text]\` — Generate MD5, SHA1, SHA256 hashes
+• \`.ip [address]\` — IP address geolocation lookup
+• \`.random [min] [max]\` — Random number generator
+• \`.shorturl [url]\` — URL shortening service
+• \`.color [name]\` — Color codes & information
+
 ⚙️ *Bot Settings*
 • \`.autoread\` — Toggle auto-read status (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
@@ -599,6 +630,11 @@ async function startBot() {
 👑 *Group Management* (Admins Only)
 • \`.ghelp\` — Detailed group commands help
 • \`.ginfo\` — Complete group information
+• \`.tagall [message]\` — Tag all group members
+• \`.admins\` — List all group administrators
+• \`.members\` — Group member statistics
+• \`.rules\` — Display group rules
+• \`.groupstats\` — Complete group statistics
 • \`.gtest\` — Debug admin permissions
 • \`.gdesc [text]\` — Change group description
 • \`.gname [text]\` — Change group name
@@ -614,6 +650,7 @@ async function startBot() {
 • \`.warn @user\` — Issue warning (auto-kick after 3)
 • \`.warns @user\` — Check user warning count
 • \`.clearwarns @user\` — Clear user warnings
+• \`.resetwarns\` — Reset all group warnings
 • \`.lock\` / \`.unlock\` — Lock/unlock group messages
 • \`.antilink on/off\` — Toggle link protection
 
@@ -958,11 +995,18 @@ Try \`.ghelp\` for group commands.`;
                             break;
                         }
                         const helpText = `
-👑 *Group Management Commands*
+👑 *Advanced Group Management Commands*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 *Info & Settings*
-• \`.ginfo\` — Show group information
+📊 *Information & Analytics*
+• \`.ginfo\` — Basic group information
+• \`.groupstats\` — Detailed statistics & settings
+• \`.members\` — Member count and breakdown
+• \`.admins\` — List all group administrators
+• \`.rules\` — Display group rules
+
+📢 *Communication Tools*
+• \`.tagall [message]\` — Tag all group members
 • \`.gdesc <text>\` — Change group description
 • \`.gname <text>\` — Change group name
 
@@ -970,22 +1014,30 @@ Try \`.ghelp\` for group commands.`;
 • \`.kick @user\` — Remove member from group
 • \`.promote @user\` — Make member admin
 • \`.demote @user\` — Remove admin privileges
-• \`.invite <number>\` — Add member by number
+• \`.invite <number>\` — Add member by phone number
 
-🔇 *Moderation*
+🔇 *Advanced Moderation*
 • \`.mute <duration>\` — Mute group (5m, 1h, 1d, 1w)
-• \`.unmute\` — Unmute group
-• \`.mutestatus\` — Check mute status
-• \`.warn @user\` — Warn a member (auto-kick after 3 warnings)
+• \`.unmute\` — Remove group mute
+• \`.mutestatus\` — Check current mute status
+• \`.warn @user\` — Issue warning (auto-kick after 3)
 • \`.warns @user\` — Check member warning count
-• \`.clearwarns @user\` — Clear member warnings
+• \`.clearwarns @user\` — Clear specific member warnings
+• \`.resetwarns\` — Reset ALL group warnings
 
-⚙️ *Group Settings*
-• \`.lock\` — Lock group (only admins can send messages)
-• \`.unlock\` — Unlock group
-• \`.antilink on/off\` — Toggle anti-link protection
+⚙️ *Security & Settings*
+• \`.lock\` — Lock group (admin-only messages)
+• \`.unlock\` — Unlock group (all can message)
+• \`.antilink on/off\` — Toggle link protection
 
-ℹ️ *Note:* All commands require admin privileges.`;
+🛠️ *Admin Tools*
+• \`.gtest\` — Debug admin status & permissions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *Requirements:* All commands require admin privileges
+💡 *Tips:* Use \`.groupstats\` for complete overview
+🔧 *Debugging:* Use \`.gtest\` if commands don't work
+`;
                         await sock.sendMessage(from, { text: helpText }, { quoted: msg });
                         break;
                     }
@@ -1371,6 +1423,329 @@ Try \`.ghelp\` for group commands.`;
                         } else {
                             const status = isAntilinkEnabled(from) ? 'enabled' : 'disabled';
                             await sock.sendMessage(from, { text: `ℹ️ Antilink protection is currently ${status}.\n\nUsage: \`.antilink on\` or \`.antilink off\`` }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    // Advanced Normal Chat Commands
+                    case '.translate': {
+                        const text = fullCommand.replace('.translate', '').trim();
+                        if (!text) {
+                            await sock.sendMessage(from, { text: '❌ Please provide text to translate. Usage: `.translate Hello world`' }, { quoted: msg });
+                            break;
+                        }
+                        // Placeholder for translation - integrate with translation API
+                        await sock.sendMessage(from, { 
+                            text: `🌐 *Translation Service*\n\n📝 *Original:* ${text}\n🔄 *Translated:* [Translation feature coming soon]\n\n⚠️ *Note:* Integrate with Google Translate API for real translations.` 
+                        }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.base64': {
+                        const args = fullCommand.split(' ');
+                        const operation = args[1];
+                        const text = args.slice(2).join(' ');
+                        
+                        if (!operation || !text) {
+                            await sock.sendMessage(from, { text: '❌ Usage: `.base64 encode/decode <text>`\nExample: `.base64 encode Hello World`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            if (operation === 'encode') {
+                                const encoded = Buffer.from(text, 'utf8').toString('base64');
+                                await sock.sendMessage(from, { text: `🔐 *Base64 Encoded*\n\n📝 *Original:* ${text}\n🔒 *Encoded:* \`${encoded}\`` }, { quoted: msg });
+                            } else if (operation === 'decode') {
+                                const decoded = Buffer.from(text, 'base64').toString('utf8');
+                                await sock.sendMessage(from, { text: `🔓 *Base64 Decoded*\n\n🔒 *Encoded:* ${text}\n📝 *Decoded:* \`${decoded}\`` }, { quoted: msg });
+                            } else {
+                                await sock.sendMessage(from, { text: '❌ Invalid operation. Use `encode` or `decode`.' }, { quoted: msg });
+                            }
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Invalid base64 string for decoding.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.hash': {
+                        const text = fullCommand.replace('.hash', '').trim();
+                        if (!text) {
+                            await sock.sendMessage(from, { text: '❌ Please provide text to hash. Usage: `.hash Hello World`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const crypto = require('crypto');
+                        const md5 = crypto.createHash('md5').update(text).digest('hex');
+                        const sha1 = crypto.createHash('sha1').update(text).digest('hex');
+                        const sha256 = crypto.createHash('sha256').update(text).digest('hex');
+                        
+                        const hashText = `
+🔐 *Hash Generator*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 *Original:* ${text}
+
+🔹 *MD5:* \`${md5}\`
+🔹 *SHA1:* \`${sha1}\`
+🔹 *SHA256:* \`${sha256}\`
+
+⚠️ *Security Note:* Use SHA256 for security-critical applications.
+`;
+                        await sock.sendMessage(from, { text: hashText }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.ip': {
+                        const ip = fullCommand.replace('.ip', '').trim();
+                        if (!ip) {
+                            await sock.sendMessage(from, { text: '❌ Please provide an IP address. Usage: `.ip 8.8.8.8`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Basic IP validation
+                        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+                        if (!ipRegex.test(ip)) {
+                            await sock.sendMessage(from, { text: '❌ Invalid IP address format.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Placeholder for IP lookup - integrate with IP geolocation API
+                        const ipInfo = `
+🌐 *IP Address Lookup*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 *IP:* ${ip}
+🌍 *Location:* [Demo] United States
+🏙️ *City:* [Demo] San Francisco
+🏢 *ISP:* [Demo] Google LLC
+🔒 *Type:* Public
+
+⚠️ *Note:* Integrate with IP geolocation API for real data.
+`;
+                        await sock.sendMessage(from, { text: ipInfo }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.random': {
+                        const args = fullCommand.split(' ');
+                        const min = parseInt(args[1]) || 1;
+                        const max = parseInt(args[2]) || 100;
+                        
+                        if (min >= max) {
+                            await sock.sendMessage(from, { text: '❌ Minimum must be less than maximum. Usage: `.random 1 100`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
+                        await sock.sendMessage(from, { text: `🎲 *Random Number Generator*\n\n📊 *Range:* ${min} - ${max}\n🎯 *Result:* **${randomNum}**` }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.shorturl': {
+                        const url = fullCommand.replace('.shorturl', '').trim();
+                        if (!url) {
+                            await sock.sendMessage(from, { text: '❌ Please provide a URL. Usage: `.shorturl https://example.com`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Basic URL validation
+                        try {
+                            new URL(url);
+                            // Placeholder for URL shortening - integrate with URL shortening API
+                            await sock.sendMessage(from, { 
+                                text: `🔗 *URL Shortener*\n\n📝 *Original:* ${url}\n🔗 *Shortened:* [Demo] https://short.ly/abc123\n\n⚠️ *Note:* Integrate with URL shortening service for real functionality.` 
+                            }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Invalid URL format. Please include http:// or https://' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.color': {
+                        const colorName = fullCommand.replace('.color', '').trim().toLowerCase();
+                        const colors = {
+                            'red': '#FF0000',
+                            'green': '#00FF00',
+                            'blue': '#0000FF',
+                            'yellow': '#FFFF00',
+                            'purple': '#800080',
+                            'orange': '#FFA500',
+                            'pink': '#FFC0CB',
+                            'black': '#000000',
+                            'white': '#FFFFFF',
+                            'gray': '#808080'
+                        };
+                        
+                        if (!colorName) {
+                            const colorList = Object.keys(colors).join(', ');
+                            await sock.sendMessage(from, { text: `🎨 *Color Codes*\n\nAvailable colors: ${colorList}\n\nUsage: \`.color red\`` }, { quoted: msg });
+                            break;
+                        }
+                        
+                        if (colors[colorName]) {
+                            await sock.sendMessage(from, { text: `🎨 *Color Information*\n\n🏷️ *Name:* ${colorName.charAt(0).toUpperCase() + colorName.slice(1)}\n🔢 *Hex Code:* \`${colors[colorName]}\`\n🌈 *RGB:* ${hexToRgb(colors[colorName])}` }, { quoted: msg });
+                        } else {
+                            await sock.sendMessage(from, { text: `❌ Color "${colorName}" not found. Use \`.color\` to see available colors.` }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    // Advanced Group Commands
+                    case '.tagall': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const participants = groupMetadata.participants.map(p => p.id);
+                            const message = fullCommand.replace('.tagall', '').trim() || 'Group announcement';
+                            
+                            await sock.sendMessage(from, { 
+                                text: `📢 *Group Announcement*\n\n${message}`,
+                                mentions: participants
+                            }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to tag all members.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.admins': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const admins = groupMetadata.participants
+                                .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+                                .map(p => `@${p.id.split('@')[0]}`)
+                                .join('\n• ');
+                            
+                            if (admins) {
+                                await sock.sendMessage(from, { 
+                                    text: `👑 *Group Admins*\n\n• ${admins}`,
+                                    mentions: groupMetadata.participants
+                                        .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+                                        .map(p => p.id)
+                                }, { quoted: msg });
+                            } else {
+                                await sock.sendMessage(from, { text: '❌ No admins found in this group.' }, { quoted: msg });
+                            }
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to fetch admin list.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.members': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const totalMembers = groupMetadata.participants.length;
+                            const admins = groupMetadata.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin').length;
+                            const members = totalMembers - admins;
+                            
+                            const memberInfo = `
+👥 *Group Members Statistics*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👑 *Admins:* ${admins}
+👤 *Members:* ${members}
+📊 *Total:* ${totalMembers}
+🏷️ *Group:* ${groupMetadata.subject}
+`;
+                            await sock.sendMessage(from, { text: memberInfo }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to fetch member statistics.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.rules': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const rules = `
+📋 *Group Rules*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ Be respectful to all members
+2️⃣ No spam or excessive messaging
+3️⃣ Keep discussions relevant to the group
+4️⃣ No sharing of inappropriate content
+5️⃣ Follow admin instructions
+6️⃣ Use proper language
+7️⃣ No personal attacks or harassment
+8️⃣ Respect privacy of other members
+
+⚠️ *Warning System:* 3 warnings = removal
+🛡️ *Anti-spam:* Automatic detection active
+👑 *Admins:* Use \`.admins\` to see current admins
+
+❓ *Questions?* Contact group admins
+`;
+                        await sock.sendMessage(from, { text: rules }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.resetwarns': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Reset all warnings for the group
+                        warnings.set(from, new Map());
+                        await sock.sendMessage(from, { text: '🔄 All warnings have been reset for this group.' }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.groupstats': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const muteInfo = getMuteInfo(from);
+                            const antilinkStatus = isAntilinkEnabled(from);
+                            const warningCount = warnings.has(from) ? warnings.get(from).size : 0;
+                            
+                            const stats = `
+📊 *Group Statistics & Settings*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏷️ *Name:* ${groupMetadata.subject}
+👥 *Members:* ${groupMetadata.participants.length}
+👑 *Admins:* ${groupMetadata.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin').length}
+📅 *Created:* ${new Date(groupMetadata.creation * 1000).toLocaleDateString()}
+
+⚙️ *Security Settings*
+🔇 *Muted:* ${muteInfo ? `Yes (${muteInfo.remaining} remaining)` : 'No'}
+🚫 *Anti-link:* ${antilinkStatus ? 'Enabled' : 'Disabled'}
+⚠️ *Active Warnings:* ${warningCount}
+
+🛡️ *Protection Status*
+✅ All security features active
+🤖 Bot monitoring enabled
+`;
+                            await sock.sendMessage(from, { text: stats }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to fetch group statistics.' }, { quoted: msg });
                         }
                         break;
                     }

@@ -5,15 +5,16 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 ## Features
 
 - 🔐 **QR Code Authentication** - Scan QR code to connect your WhatsApp account
-- 🤖 **Rich Command Set** - 25+ commands for various functions
+- 🤖 **Rich Command Set** - 35+ commands for various functions
 - 🎲 **Fun Commands** - Jokes, quotes, dice, coin flip, 8-ball, and more
 - 🔧 **Utility Tools** - Calculator, password generator, time, weather info
+- 🛠️ **Advanced Tools** - Base64 encoding, hash generation, IP lookup, URL shortening
 - 🎨 **Media Processing** - Create stickers, convert sticker to image
 - 📱 **Auto Status View** - Automatically mark status messages as read
 - 📞 **Call Blocking** - Block incoming calls when enabled
-- 👑 **Group Management** - Complete admin tools for group control
-- 📊 **Statistics** - Track bot usage and performance
-- 🛡️ **Security Features** - Anti-link protection, warning system
+- 👑 **Advanced Group Management** - Complete admin tools with member analytics
+- 📊 **Statistics & Analytics** - Track bot usage, group stats, and performance
+- 🛡️ **Security Features** - Anti-link protection, warning system, moderation tools
 - ⚡ **Fast Response** - Built with Baileys for optimal performance
 
 ## Bot Commands
@@ -46,6 +47,17 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 | `.weather [city]` | Weather info (demo) |
 | `.qr [text]` | Generate QR code info |
 
+### Advanced Tools
+| Command | Description |
+|---------|-------------|
+| `.translate [text]` | Text translation (demo) |
+| `.base64 encode/decode [text]` | Base64 encoder/decoder |
+| `.hash [text]` | Generate MD5/SHA hashes |
+| `.ip [address]` | IP address lookup |
+| `.random [min] [max]` | Random number generator |
+| `.shorturl [url]` | URL shortener (demo) |
+| `.color [name]` | Color code lookup |
+
 ### Media Commands
 | Command | Description |
 |---------|-------------|
@@ -64,12 +76,18 @@ A powerful WhatsApp bot that can scan QR codes, connect to your WhatsApp account
 |---------|-------------|
 | `.ghelp` | Show all group commands |
 | `.ginfo` | Show group information |
+| `.tagall [message]` | Tag all group members |
+| `.admins` | List all group admins |
+| `.members` | Group member statistics |
+| `.rules` | Display group rules |
+| `.groupstats` | Detailed group analytics |
 | `.kick @user` | Remove member from group |
 | `.promote @user` | Make member admin |
 | `.demote @user` | Remove admin privileges |
 | `.mute [duration]` | Mute group (e.g., 5m, 1h, 1d) |
 | `.unmute` | Unmute group |
 | `.warn @user` | Issue warning to member |
+| `.resetwarns` | Reset all group warnings |
 | `.lock` / `.unlock` | Lock/unlock group |
 | `.antilink on/off` | Toggle link protection |
 
@@ -130,10 +148,17 @@ Send `.help` to see all available commands or `.panel` for the main control pane
 1. **Create Sticker**: Send an image with `.sticker` caption
 2. **Convert Sticker**: Reply to a sticker with `.toimg`
 
+### Advanced Tools
+- `.base64 encode Hello` - Encode text to base64
+- `.hash mypassword` - Generate hashes for text
+- `.random 1 100` - Generate number between 1-100
+- `.color red` - Get hex code for red color
+
 ### Group Management
-- `.ginfo` - View group details
-- `.mute 1h` - Mute group for 1 hour
-- `.warn @username` - Issue warning to member
+- `.tagall Important announcement!` - Tag all members
+- `.groupstats` - View detailed group analytics
+- `.members` - See member breakdown
+- `.resetwarns` - Clear all warnings in group
 
 ## Configuration
 
