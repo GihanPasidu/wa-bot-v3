@@ -3,17 +3,31 @@
   "version": "1.0.0",
   "description": "WhatsApp Bot with QR code scanning and bot commands",
   "main": "bot.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "dev": "nodemon bot.js",
+    "setup": "node setup-apis.js",
+    "setup-apis": "node setup-apis.js"
   },
-  "keywords": ["whatsapp", "bot", "qr-code", "automation"],
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "qr-code",
+    "automation"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
-    "qrcode-terminal": "^0.12.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.2",
     "pino": "^9.0.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
     "sharp": "^0.33.4"
   },
   "devDependencies": {

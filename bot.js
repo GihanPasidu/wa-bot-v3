@@ -10,14 +10,11 @@ const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const { startWebServer, updateQRCode, updateBotStatus, clearQRCode } = require('./web-server');
+const { config, apiServices, getConfigStatus, getSetupInstructions } = require('./api-config');
 
-// Bot configuration
-const config = {
-    autoRead: false,
-    antiCall: false,
-    adminJids: ['94752735513@s.whatsapp.net'], // E.164 without +, then @s.whatsapp.net
-    botEnabled: true
-};
+// Bot configuration (now using API config)
+const botConfig = config.bot;
 
 // Warning system storage
 const warnings = new Map(); // groupJid -> Map(userJid -> count)
@@ -315,6 +312,10 @@ async function createStickerFromImageBuffer(buffer) {
 }
 
 async function startBot() {
+    // Start web server first
+    await startWebServer();
+    updateBotStatus('Starting WhatsApp Bot...');
+    
     const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
     const { version } = await fetchLatestBaileysVersion();
 
@@ -332,15 +333,31 @@ async function startBot() {
         if (qr) {
             console.log('🔐 QR received — scan with WhatsApp to link:');
             qrcode.generate(qr, { small: true });
-            console.log('\nOpen WhatsApp → Linked devices → Link a device.');
+            console.log('\n📱 Web Interface: Open the web URL to scan QR code');
+            console.log('📲 Mobile: Open WhatsApp → Linked devices → Link a device.');
+            
+            // Update web interface with QR code
+            updateQRCode(qr);
+            updateBotStatus('🔐 QR Code ready - Scan to connect');
         }
         if (connection === 'open') {
             console.log('✅ Bot connected and ready.');
             console.log('📋 Quick Commands: .help | .panel | .sticker | .calc | .time | .ping');
+            
+            // Clear QR code and update status
+            clearQRCode();
+            updateBotStatus('✅ Connected and Ready');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Connection closed. Reconnect:', shouldReconnect);
-            if (shouldReconnect) startBot();
+            
+            updateBotStatus('❌ Connection closed');
+            if (shouldReconnect) {
+                updateBotStatus('🔄 Reconnecting...');
+                startBot();
+            } else {
+                updateBotStatus('❌ Logged out - Restart required');
+            }
         }
     });
 
@@ -359,7 +376,7 @@ async function startBot() {
             if (!from) continue;
             // Handle status updates: mark as read if autoRead, then skip further processing
             if (from === 'status@broadcast') {
-                if (config.autoRead) {
+                if (botConfig.autoRead) {
                     try { await sock.readMessages([msg.key]); } catch (_) {}
                 }
                 continue;
@@ -418,7 +435,7 @@ async function startBot() {
             }
 
             // Auto-read normal messages
-            if (config.autoRead) {
+            if (botConfig.autoRead) {
                 try { await sock.readMessages([msg.key]); } catch (_) {}
             }
 
@@ -433,7 +450,7 @@ async function startBot() {
                 console.log(`Is Group: ${isGroup}, Is Admin: ${isAdmin}`);
                 
                 // If bot is OFF, only allow .on command
-                if (!config.botEnabled && command !== '.on') {
+                if (!botConfig.botEnabled && command !== '.on') {
                     await sock.sendMessage(from, { text: '🛑 The bot is currently OFF. Send `.on` to enable it.' }, { quoted: msg });
                     continue;
                 }
@@ -449,13 +466,23 @@ async function startBot() {
                         break;
                     }
                     case '.on': {
-                        config.botEnabled = true;
+                        botConfig.botEnabled = true;
                         await sock.sendMessage(from, { text: '✅ Bot is now ON.\n\nTip: Send `.panel` to view the menu.' }, { quoted: msg });
                         break;
                     }
                     case '.off': {
-                        config.botEnabled = false;
+                        botConfig.botEnabled = false;
                         await sock.sendMessage(from, { text: '🛑 Bot is now OFF.\n\nOnly the `.on` command will be accepted until it is re-enabled.' }, { quoted: msg });
+                        break;
+                    }
+                    
+                    // 🔑 API Configuration Commands
+                    case '.apiconfig':
+                    case '.apis': {
+                        const status = getConfigStatus();
+                        await sock.sendMessage(from, { 
+                            text: `🔑 **API CONFIGURATION STATUS**\n\n${status.join('\n')}\n\n${getSetupInstructions()}` 
+                        }, { quoted: msg });
                         break;
                     }
                     case '.panel': {
@@ -714,11 +741,21 @@ Type \`.help\` for all commands!
                     case '.weather': {
                         const city = fullCommand.replace('.weather', '').trim();
                         if (!city) {
-                            await sock.sendMessage(from, { text: '❌ Please specify a city. Usage: `.weather London`' }, { quoted: msg });
+                            await sock.sendMessage(from, { text: '🌤️ Please provide a city name.\nExample: `.weather London`' }, { quoted: msg });
                             break;
                         }
-                        const weatherInfo = await getWeatherInfo(city);
-                        await sock.sendMessage(from, { text: weatherInfo }, { quoted: msg });
+
+                        const weatherResult = await apiServices.getWeather(city);
+                        if (weatherResult.error) {
+                            await sock.sendMessage(from, { text: weatherResult.error }, { quoted: msg });
+                        } else {
+                            const weatherMsg = `🌤️ **Weather in ${weatherResult.city}, ${weatherResult.country}**\n\n` +
+                                `🌡️ **Temperature:** ${weatherResult.temperature}°C\n` +
+                                `☁️ **Condition:** ${weatherResult.description}\n` +
+                                `💧 **Humidity:** ${weatherResult.humidity}%\n` +
+                                `💨 **Wind Speed:** ${weatherResult.windSpeed} m/s`;
+                            await sock.sendMessage(from, { text: weatherMsg }, { quoted: msg });
+                        }
                         break;
                     }
                     case '.qr': {
@@ -1368,30 +1405,46 @@ Try \`.ghelp\` for group commands.`;
                     case '.ip': {
                         const ip = fullCommand.replace('.ip', '').trim();
                         if (!ip) {
-                            await sock.sendMessage(from, { text: '❌ Please provide an IP address. Usage: `.ip 8.8.8.8`' }, { quoted: msg });
+                            await sock.sendMessage(from, { text: '🌐 Please provide an IP address.\nExample: `.ip 8.8.8.8`' }, { quoted: msg });
                             break;
                         }
-                        
-                        // Basic IP validation
-                        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-                        if (!ipRegex.test(ip)) {
-                            await sock.sendMessage(from, { text: '❌ Invalid IP address format.' }, { quoted: msg });
-                            break;
-                        }
-                        
-                        // Placeholder for IP lookup - integrate with IP geolocation API
-                        const ipInfo = `
-🌐 *IP Address Lookup*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 *IP:* ${ip}
-🌍 *Location:* [Demo] United States
-🏙️ *City:* [Demo] San Francisco
-🏢 *ISP:* [Demo] Google LLC
-🔒 *Type:* Public
 
-⚠️ *Note:* Integrate with IP geolocation API for real data.
-`;
-                        await sock.sendMessage(from, { text: ipInfo }, { quoted: msg });
+                        const ipResult = await apiServices.getIpInfo(ip);
+                        if (ipResult.error) {
+                            await sock.sendMessage(from, { text: ipResult.error }, { quoted: msg });
+                        } else {
+                            const ipMsg = `🌐 **IP Information** (${ipResult.service})\n\n` +
+                                `📍 **IP:** ${ipResult.ip}\n` +
+                                `🌍 **Country:** ${ipResult.country}\n` +
+                                `📍 **Region:** ${ipResult.region}\n` +
+                                `🏙️ **City:** ${ipResult.city}\n` +
+                                `� **ISP:** ${ipResult.isp}\n` +
+                                `⏰ **Timezone:** ${ipResult.timezone}`;
+                            await sock.sendMessage(from, { text: ipMsg }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.currency':
+                    case '.exchange': {
+                        const args = fullCommand.split(' ').slice(1);
+                        if (args.length < 2) {
+                            await sock.sendMessage(from, { text: '💱 **Currency Exchange**\n\nUsage: `.currency USD EUR 100`\nOr: `.currency USD EUR` (for 1 unit)' }, { quoted: msg });
+                            break;
+                        }
+
+                        const fromCurrency = args[0]?.toUpperCase();
+                        const toCurrency = args[1]?.toUpperCase();
+                        const amount = parseFloat(args[2]) || 1;
+
+                        const currencyResult = await apiServices.getCurrencyRate(fromCurrency, toCurrency, amount);
+                        if (currencyResult.error) {
+                            await sock.sendMessage(from, { text: currencyResult.error }, { quoted: msg });
+                        } else {
+                            await sock.sendMessage(from, { 
+                                text: `💱 **Currency Exchange**\n\n${currencyResult.amount} ${currencyResult.from} = ${currencyResult.result.toFixed(2)} ${currencyResult.to}\n\nRate: 1 ${currencyResult.from} = ${currencyResult.rate.toFixed(4)} ${currencyResult.to}` 
+                            }, { quoted: msg });
+                        }
                         break;
                     }
                     
@@ -1413,19 +1466,17 @@ Try \`.ghelp\` for group commands.`;
                     case '.shorturl': {
                         const url = fullCommand.replace('.shorturl', '').trim();
                         if (!url) {
-                            await sock.sendMessage(from, { text: '❌ Please provide a URL. Usage: `.shorturl https://example.com`' }, { quoted: msg });
+                            await sock.sendMessage(from, { text: '🔗 Please provide a URL to shorten.\nExample: `.shorturl https://example.com`' }, { quoted: msg });
                             break;
                         }
-                        
-                        // Basic URL validation
-                        try {
-                            new URL(url);
-                            // Placeholder for URL shortening - integrate with URL shortening API
+
+                        const shortenResult = await apiServices.shortenUrl(url);
+                        if (shortenResult.error) {
+                            await sock.sendMessage(from, { text: shortenResult.error }, { quoted: msg });
+                        } else {
                             await sock.sendMessage(from, { 
-                                text: `🔗 *URL Shortener*\n\n📝 *Original:* ${url}\n🔗 *Shortened:* [Demo] https://short.ly/abc123\n\n⚠️ *Note:* Integrate with URL shortening service for real functionality.` 
+                                text: `🔗 **URL Shortened** (${shortenResult.service})\n\n**Original:** ${url}\n**Short:** ${shortenResult.shortUrl}` 
                             }, { quoted: msg });
-                        } catch (error) {
-                            await sock.sendMessage(from, { text: '❌ Invalid URL format. Please include http:// or https://' }, { quoted: msg });
                         }
                         break;
                     }
