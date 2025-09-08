@@ -1,0 +1,41 @@
+name: Keep Bot Alive
+
+on:
+  schedule:
+    # Run every 10 minutes to keep the bot awake
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Bot Health Endpoint
+        run: |
+          # Replace with your actual Render URL when deployed
+          RENDER_URL="${{ secrets.RENDER_URL }}"
+          if [ -z "$RENDER_URL" ]; then
+            echo "⚠️ RENDER_URL secret not set. Please add your Render URL to repository secrets."
+            echo "Format: https://your-app-name.onrender.com"
+            exit 0
+          fi
+          
+          echo "🔄 Pinging bot at: $RENDER_URL/health"
+          
+          # Ping the health endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$RENDER_URL/health" || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Bot is alive! Response: $response"
+          else
+            echo "⚠️ Bot might be sleeping. Response: $response"
+            echo "Trying to wake up..."
+            curl -f "$RENDER_URL/" || echo "Wake-up attempt completed"
+          fi
+          
+      - name: Log Status
+        run: |
+          echo "Keep-alive ping completed at $(date)"
+          echo "Next ping in 10 minutes"

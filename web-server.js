@@ -157,11 +157,32 @@ app.get('/', (req, res) => {
 
 // API endpoints
 app.get('/health', (req, res) => {
+    const uptime = process.uptime();
+    const uptimeHours = Math.floor(uptime / 3600);
+    const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+    
     res.json({ 
         status: 'healthy', 
-        uptime: process.uptime(),
+        uptime: uptime,
+        uptimeFormatted: `${uptimeHours}h ${uptimeMinutes}m`,
         timestamp: new Date().toISOString(),
-        botStatus: botStatus
+        botStatus: botStatus,
+        keepAlive: true,
+        platform: process.env.NODE_ENV || 'development'
+    });
+});
+
+// Keep-alive endpoint specifically for monitoring services
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
+// Wake-up endpoint
+app.get('/wake', (req, res) => {
+    res.json({
+        message: '✅ Bot is awake!',
+        status: botStatus,
+        timestamp: new Date().toISOString()
     });
 });
 

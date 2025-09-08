@@ -1706,6 +1706,25 @@ startBot().catch((e) => {
     process.exit(1);
 });
 
+// Keep-alive mechanism for free hosting platforms (Render, Railway, etc.)
+if (process.env.NODE_ENV === 'production') {
+    const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
+    
+    console.log('🔄 Starting keep-alive system for production...');
+    
+    // Self-ping every 14 minutes to prevent sleeping
+    setInterval(async () => {
+        try {
+            const response = await fetch(`${RENDER_URL}/health`);
+            console.log(`✅ Keep-alive ping: ${response.status} at ${new Date().toISOString()}`);
+        } catch (error) {
+            console.log('⚠️ Keep-alive ping failed:', error.message);
+        }
+    }, 14 * 60 * 1000); // Every 14 minutes
+    
+    console.log(`🌐 Keep-alive configured for: ${RENDER_URL}`);
+}
+
 process.on('SIGINT', () => {
     console.log('\nReceived SIGINT. Exit.');
     if (unmuteTimer) {
