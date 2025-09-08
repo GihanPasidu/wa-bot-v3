@@ -3,14 +3,22 @@ const qrcode = require('qrcode');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Performance optimizations
+app.set('x-powered-by', false); // Remove Express header
+app.use(express.json({ limit: '1mb' })); // Limit payload size
+app.use(express.static('public', {
+    maxAge: '1d', // Cache static files for 1 day
+    etag: false   // Disable ETags for better performance
+}));
+
 // Global variables to store QR code
 let currentQRCode = null;
 let botStatus = 'Starting...';
 let lastUpdate = new Date();
 
-// Middleware
-app.use(express.static('public'));
-app.use(express.json());
+// Performance monitoring
+let requestCount = 0;
+let lastReset = Date.now();
 
 // Serve QR code page
 app.get('/', (req, res) => {
@@ -155,11 +163,26 @@ app.get('/', (req, res) => {
     `);
 });
 
-// API endpoints
+// Optimized API endpoints with caching headers
 app.get('/health', (req, res) => {
+    requestCount++;
+    
+    // Reset counter every hour
+    if (Date.now() - lastReset > 3600000) {
+        requestCount = 0;
+        lastReset = Date.now();
+    }
+    
     const uptime = process.uptime();
     const uptimeHours = Math.floor(uptime / 3600);
     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+    
+    // Set cache headers for better performance
+    res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    });
     
     res.json({ 
         status: 'healthy', 
@@ -168,17 +191,21 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         botStatus: botStatus,
         keepAlive: true,
-        platform: process.env.NODE_ENV || 'development'
+        platform: process.env.NODE_ENV || 'development',
+        requests: requestCount,
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
     });
 });
 
-// Keep-alive endpoint specifically for monitoring services
+// Optimized keep-alive endpoint
 app.get('/ping', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
     res.status(200).send('pong');
 });
 
 // Wake-up endpoint
 app.get('/wake', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
     res.json({
         message: '✅ Bot is awake!',
         status: botStatus,

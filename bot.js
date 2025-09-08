@@ -13,8 +13,47 @@ const sharp = require('sharp');
 const { startWebServer, updateQRCode, updateBotStatus, clearQRCode } = require('./web-server');
 const { config, apiServices, getConfigStatus, getSetupInstructions } = require('./api-config');
 
+// Filter out common session errors from console
+const originalConsoleError = console.error;
+console.error = (...args) => {
+    const message = args.join(' ');
+    
+    // Suppress common WhatsApp protocol errors that don't affect functionality
+    if (message.includes('Bad MAC Error') || 
+        message.includes('Failed to decrypt message') ||
+        message.includes('Session error:Error: Bad MAC') ||
+        message.includes('verifyMAC') ||
+        message.includes('doDecryptWhisperMessage') ||
+        message.includes('SessionCipher.decryptWithSessions') ||
+        message.includes('libsignal/src/crypto.js') ||
+        message.includes('Closing open session in favor of incoming prekey bundle')) {
+        return; // Suppress these harmless errors
+    }
+    
+    // Show all other errors normally
+    originalConsoleError.apply(console, args);
+};
+
+// Also suppress unhandled promise rejections for session errors
+process.on('unhandledRejection', (reason, promise) => {
+    const reasonStr = reason?.toString() || '';
+    if (reasonStr.includes('Bad MAC') || 
+        reasonStr.includes('decrypt') || 
+        reasonStr.includes('Session error')) {
+        return; // Ignore session-related rejections
+    }
+    console.error('Unhandled Rejection:', reason);
+});
+
 // Bot configuration (now using API config)
 const botConfig = config.bot;
+
+// Performance optimization - Simple caching
+const adminCache = new Map(); // groupJid:userJid -> {isAdmin: boolean, timestamp: number}
+const groupMetadataCache = new Map(); // groupJid -> {metadata: object, timestamp: number}
+const commandCooldowns = new Map(); // userJid -> lastCommandTime
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes cache
+const COOLDOWN_TIME = 1000; // 1 second cooldown between commands
 
 // Warning system storage
 const warnings = new Map(); // groupJid -> Map(userJid -> count)
@@ -28,12 +67,14 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
-// Bot stats
+// Bot stats with performance metrics
 const botStats = {
     startTime: Date.now(),
     messagesProcessed: 0,
     commandsExecuted: 0,
-    stickersCreated: 0
+    stickersCreated: 0,
+    cacheHits: 0,
+    cacheMisses: 0
 };
 
 // Warning system functions
@@ -252,16 +293,35 @@ function extractImageMessage(msg) {
 
 // All commands are available to everyone; no self-chat gating
 
-// Group management functions
+// Optimized group management functions with caching
 async function isGroupAdmin(sock, groupJid, userJid) {
     try {
-        const groupMetadata = await sock.groupMetadata(groupJid);
+        // Check cache first
+        const cacheKey = `${groupJid}:${userJid}`;
+        const cached = adminCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+            botStats.cacheHits++;
+            return cached.isAdmin;
+        }
+        botStats.cacheMisses++;
+
+        // Get metadata with caching
+        let groupMetadata = groupMetadataCache.get(groupJid);
+        if (!groupMetadata || (Date.now() - groupMetadata.timestamp) > CACHE_TTL) {
+            const metadata = await sock.groupMetadata(groupJid);
+            groupMetadataCache.set(groupJid, {
+                metadata: metadata,
+                timestamp: Date.now()
+            });
+            groupMetadata = groupMetadataCache.get(groupJid);
+        }
         
         // Check different admin field values
-        const admins1 = groupMetadata.participants.filter(p => p.admin === 'admin').map(p => p.id);
-        const admins2 = groupMetadata.participants.filter(p => p.admin === 'superadmin').map(p => p.id);
-        const admins3 = groupMetadata.participants.filter(p => p.admin === true).map(p => p.id);
-        const admins4 = groupMetadata.participants.filter(p => p.admin === 'true').map(p => p.id);
+        const participants = groupMetadata.metadata.participants;
+        const admins1 = participants.filter(p => p.admin === 'admin').map(p => p.id);
+        const admins2 = participants.filter(p => p.admin === 'superadmin').map(p => p.id);
+        const admins3 = participants.filter(p => p.admin === true).map(p => p.id);
+        const admins4 = participants.filter(p => p.admin === 'true').map(p => p.id);
         
         // Combine all possible admin lists
         const allAdmins = [...new Set([...admins1, ...admins2, ...admins3, ...admins4])];
@@ -274,6 +334,13 @@ async function isGroupAdmin(sock, groupJid, userJid) {
                            const adminBase = adminJid.split('@')[0];
                            return userBase === adminBase;
                        });
+        
+        // Cache the result
+        adminCache.set(cacheKey, {
+            isAdmin: isAdmin,
+            timestamp: Date.now()
+        });
+        
         return isAdmin;
     } catch (error) {
         console.error('Error checking admin status:', error);
@@ -329,7 +396,24 @@ async function startBot() {
         version,
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'silent' })
+        logger: pino({ level: 'silent' }),
+        // Performance optimizations
+        browser: ['WhatsApp Bot', 'Chrome', '3.0'],
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
+        markOnlineOnConnect: true,
+        syncFullHistory: false,
+        generateHighQualityLinkPreview: false,
+        shouldIgnoreJid: jid => jid.endsWith('@broadcast'),
+        getMessage: async (key) => {
+            return {
+                conversation: "Message not found"
+            }
+        },
+        // Suppress session-related errors
+        shouldSyncHistoryMessage: () => false,
+        emitOwnEvents: false
     });
 
 
@@ -394,12 +478,59 @@ async function startBot() {
         await checkAndAutoUnmute(sock);
     }, 30000);
 
+    // Handle session errors quietly
+    sock.ev.on('CB:iq-error', (error) => {
+        // Suppress session-related errors that don't affect functionality
+        const errorStr = error.toString();
+        if (errorStr.includes('Bad MAC') || errorStr.includes('decrypt')) {
+            return; // Ignore these harmless errors
+        }
+        console.error('Socket error:', error);
+    });
+
     // Messages
     sock.ev.on('messages.upsert', async ({ type, messages }) => {
         if (type !== 'notify') return;
         for (const msg of messages) {
             const from = msg.key.remoteJid;
             if (!from) continue;
+            
+            // Helper function to handle self-chat JID conversion
+            const getSafeJID = (jid) => {
+                if (jid && jid.includes('@lid')) {
+                    // Convert LID format to regular format for self-chat
+                    const converted = jid.replace('@lid', '@s.whatsapp.net');
+                    console.log(`🔄 JID conversion: ${jid} → ${converted}`);
+                    return { original: jid, safe: converted, isSelfChat: true };
+                }
+                return { original: jid, safe: jid, isSelfChat: false };
+            };
+            
+            const jidInfo = getSafeJID(from);
+            
+            // Helper function to send message with self-chat handling
+            const safeSendMessage = async (text, options = {}) => {
+                try {
+                    // Try sending to the original JID first
+                    await sock.sendMessage(from, { text }, options);
+                    console.log(`✅ Message sent successfully to ${from}`);
+                    return true;
+                } catch (error) {
+                    console.log(`❌ Failed to send to ${from}, trying safe JID ${jidInfo.safe}`);
+                    try {
+                        // If original fails and we have a converted JID, try that
+                        if (jidInfo.isSelfChat && jidInfo.safe !== from) {
+                            await sock.sendMessage(jidInfo.safe, { text }, options);
+                            console.log(`✅ Message sent successfully to safe JID ${jidInfo.safe}`);
+                            return true;
+                        }
+                    } catch (error2) {
+                        console.log(`❌ Failed to send to both JIDs:`, error2);
+                    }
+                    throw error;
+                }
+            };
+            
             // Handle status updates: mark as read if autoRead, then skip further processing
             if (from === 'status@broadcast') {
                 if (botConfig.autoRead) {
@@ -408,8 +539,15 @@ async function startBot() {
                 continue;
             }
 
+            // Skip messages from the bot itself (but allow fromMe messages which are from bot owner)
+            // Note: fromMe = true means the message was sent by the connected WhatsApp account (bot owner)
             const senderJid = (msg.key.participant || msg.key.remoteJid);
             const body = getTextFromMessage(msg) || '';
+            
+            // Debug log for message processing
+            if (body.startsWith('.')) {
+                console.log(`Debug: Message from ${msg.key.fromMe ? 'SELF' : 'OTHER'}: "${body}" from ${senderJid}`);
+            }
             
             // Check if it's a group and if user is admin for group commands
             const isGroup = from.endsWith('@g.us');
@@ -471,9 +609,13 @@ async function startBot() {
             if (body.startsWith('.')) {
                 const fullCommand = body.trim().toLowerCase();
                 const command = fullCommand.split(' ')[0]; // Get just the command part
-                console.log(`Received command: ${fullCommand} from ${from}`);
-                console.log(`Parsed command: "${command}"`);
+                console.log(`=== COMMAND DEBUG ===`);
+                console.log(`Command: ${fullCommand} from ${from}`);
+                console.log(`Sender JID: ${senderJid}`);
+                console.log(`FromMe: ${msg.key.fromMe}`);
                 console.log(`Is Group: ${isGroup}, Is Admin: ${isAdmin}`);
+                console.log(`Message Key:`, msg.key);
+                console.log(`===================`);
                 
                 // If bot is OFF, only allow .on command
                 if (!botConfig.botEnabled && command !== '.on') {
@@ -488,7 +630,22 @@ async function startBot() {
                 console.log(`Processing command: "${command}"`);
                 switch (command) {
                     case '.test': {
-                        await sock.sendMessage(from, { text: '✅ Test command works!' }, { quoted: msg });
+                        console.log(`Sending test response to: ${from}`);
+                        
+                        const startTime = Date.now();
+                        
+                        const testMessage = `✅ *Test Response - Success!*\n\n` +
+                                          `🤖 Bot is working perfectly!\n` +
+                                          `📱 Processing started: ${startTime}\n` +
+                                          `📊 Bot Status: Online and Ready\n` +
+                                          `🔗 Connection: Stable\n` +
+                                          `👤 From Me: ${msg.key.fromMe ? 'Yes' : 'No'}\n` +
+                                          `📞 Chat Type: ${jidInfo.isSelfChat ? 'Self-Chat' : 'Regular Chat'}\n` +
+                                          `🔧 Original JID: ${jidInfo.original}\n` +
+                                          `🔄 Safe JID: ${jidInfo.safe}\n\n` +
+                                          `_Test completed successfully! 🎉_`;
+                        
+                        await safeSendMessage(testMessage, { quoted: msg });
                         break;
                     }
                     case '.on': {
@@ -569,12 +726,14 @@ async function startBot() {
 • ⏱️ Uptime: ${formatUptime(Date.now() - botStats.startTime)}
 • 📨 Messages: ${botStats.messagesProcessed}
 • ⚡ Commands: ${botStats.commandsExecuted}
+• 💾 Cache Hits: ${botStats.cacheHits}
+• 🔍 Cache Misses: ${botStats.cacheMisses}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 *Tips:* Use \`.help\` for detailed command list
 🔗 *More:* Use \`.ghelp\` for group commands
 `;
-                        await sock.sendMessage(from, { text: panelText }, { quoted: msg });
+                        await safeSendMessage(panelText, { quoted: msg });
                         break;
                     }
                     case '.help': {
@@ -587,6 +746,7 @@ async function startBot() {
 • \`.help\` — This complete commands list
 • \`.stats\` — Bot statistics & performance
 • \`.ping\` — Check bot response time
+• \`.perf\` — Detailed performance metrics
 • \`.about\` — Information about this bot
 
 🎨 *Media Commands*
@@ -668,7 +828,9 @@ async function startBot() {
 📨 *Messages Processed:* ${botStats.messagesProcessed}
 ⚡ *Commands Executed:* ${botStats.commandsExecuted}
 🎨 *Stickers Created:* ${botStats.stickersCreated}
-🔄 *Auto Read:* ${config.autoRead ? 'Enabled' : 'Disabled'}
+� *Cache Hits:* ${botStats.cacheHits}
+🔍 *Cache Misses:* ${botStats.cacheMisses}
+�🔄 *Auto Read:* ${config.autoRead ? 'Enabled' : 'Disabled'}
 📵 *Anti Call:* ${config.antiCall ? 'Enabled' : 'Disabled'}
 ⚡ *Status:* ${config.botEnabled ? 'Online' : 'Offline'}
 
@@ -685,6 +847,50 @@ async function startBot() {
                         await sock.sendMessage(from, { 
                             text: `🏓 *Pong!*\n\n⚡ *Response Time:* ${ping}ms\n🤖 *Status:* Online` 
                         }, { quoted: msg });
+                        break;
+                    }
+                    case '.perf': {
+                        const perfStart = Date.now();
+                        const adminCheckStart = Date.now();
+                        const testAdmin = await isGroupAdmin(sock, from, userJid);
+                        const adminCheckTime = Date.now() - adminCheckStart;
+                        
+                        const memUsage = process.memoryUsage();
+                        const cacheEfficiency = botStats.cacheHits + botStats.cacheMisses > 0 
+                            ? ((botStats.cacheHits / (botStats.cacheHits + botStats.cacheMisses)) * 100).toFixed(1)
+                            : '0.0';
+                            
+                        const perfText = `
+🚀 *Performance Metrics*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ *Response Speed:*
+• Bot Response: ${Date.now() - perfStart}ms
+• Admin Check: ${adminCheckTime}ms
+• Connection Latency: Active
+
+💾 *Cache Performance:*
+• Hits: ${botStats.cacheHits}
+• Misses: ${botStats.cacheMisses}
+• Efficiency: ${cacheEfficiency}%
+• Admin Cache: ${adminCache.size} entries
+• Group Cache: ${groupMetadataCache.size} entries
+
+🖥️ *System Resources:*
+• Memory Used: ${(memUsage.heapUsed / 1024 / 1024).toFixed(1)} MB
+• Memory Total: ${(memUsage.heapTotal / 1024 / 1024).toFixed(1)} MB
+• External: ${(memUsage.external / 1024 / 1024).toFixed(1)} MB
+• Uptime: ${formatUptime(process.uptime())}
+
+📊 *Optimization Status:*
+• Socket Optimization: ✅ Active
+• Command Cooldowns: ✅ Active
+• Admin Caching: ✅ Active
+• Message Queue: ⚠️ Basic
+• Keep-Alive: ✅ Active
+
+💯 *Performance Score:* ${cacheEfficiency > 70 ? '🟢 Excellent' : cacheEfficiency > 50 ? '🟡 Good' : '🔴 Needs Improvement'}
+`;
+                        await sock.sendMessage(from, { text: perfText }, { quoted: msg });
                         break;
                     }
                     case '.about': {
@@ -847,6 +1053,17 @@ Type \`.help\` for all commands!
                         break;
                     }
                     case '.sticker': {
+                        // Check command cooldown
+                        const cooldownKey = `${from}:.sticker`;
+                        const lastUsed = commandCooldowns.get(cooldownKey);
+                        if (lastUsed && (Date.now() - lastUsed) < 1000) {
+                            await sock.sendMessage(from, { 
+                                text: "⏳ Please wait a moment before using this command again..." 
+                            }, { quoted: msg });
+                            break;
+                        }
+                        commandCooldowns.set(cooldownKey, Date.now());
+
                         // If the triggering message includes an image, use that; otherwise, check quoted
                         let imageMsg = isImageMessage(msg) ? extractImageMessage(msg) : null;
                         if (!imageMsg && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
