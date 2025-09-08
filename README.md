@@ -67,7 +67,9 @@ adminJids: ['your-number@s.whatsapp.net']
 node bot.js
 ```
 
-5. Scan the QR code with WhatsApp Web
+5. Authenticate with WhatsApp:
+   - **Web Interface**: Open `http://localhost:10000` in your browser
+   - **Terminal**: Scan the QR code displayed in the console
 
 ## Dependencies
 
@@ -125,12 +127,18 @@ node bot.js
 
 ### First-Time Setup After Deployment
 
-1. **Scan QR Code**
-   - Check Render logs for QR code
-   - Scan with WhatsApp to authenticate
-   - Bot will start automatically after authentication
+1. **Access QR Code Interface**
+   - Visit your deployed URL: `https://your-app-name.onrender.com`
+   - Professional QR code authentication page will load
+   - Page auto-refreshes every 10 seconds
 
-2. **Test Bot Commands**
+2. **Scan QR Code**
+   - QR codes appear automatically on the webpage
+   - Open WhatsApp → Settings → Linked Devices → Link a Device
+   - Scan the QR code from the webpage
+   - Page will show "Connected Successfully!" when done
+
+3. **Test Bot Commands**
    - Send `.ping` to test connectivity
    - Use `.help` to see all available commands
    - Verify all features work correctly
@@ -139,6 +147,8 @@ node bot.js
 
 - **Persistent Storage**: Auth data will persist across deployments
 - **Health Checks**: Automatic health monitoring at `/health`
+- **QR Code Interface**: User-friendly QR authentication at `/` or `/qr`
+- **QR Data API**: JSON QR code data available at `/qr-data`
 - **Keep-Alive**: Self-ping every 5 minutes to prevent service sleeping
 - **Auto-Deploy**: Automatically deploys on GitHub pushes
 - **Scaling**: Upgrade to paid plans for better performance

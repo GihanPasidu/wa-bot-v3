@@ -13,6 +13,7 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const axios = require('axios');
 const http = require('http');
+const QRCode = require('qrcode');
 
 // Bot configuration
 const config = {
@@ -24,6 +25,10 @@ const config = {
 
 // Bot startup time for uptime calculation
 const startTime = Date.now();
+
+// QR code storage for web interface
+let currentQRCode = null;
+let connectionStatus = 'disconnected'; // 'disconnected', 'connecting', 'connected'
 
 // Warning system storage
 const warnings = new Map(); // groupJid -> Map(userJid -> count)
@@ -486,27 +491,58 @@ async function startBot() {
         version,
         auth: state,
         printQRInTerminal: false,
-        logger: pino({ level: 'silent' })
+        logger: pino({ level: 'silent' }),
+        browser: ['CloudNextra Bot', 'Desktop', '3.0.0']
     });
 
 
     // QR handling
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            console.log('� QR Code Generated — Please scan with WhatsApp:');
+            console.log('📱 QR Code Generated — Please scan with WhatsApp:');
             qrcode.generate(qr, { small: true });
             console.log('\n📱 Steps: Open WhatsApp → Settings → Linked Devices → Link a Device');
-            console.log('⏱️  QR Code expires in 60 seconds...\n');
+            console.log('⏱️  QR Code expires in 60 seconds...');
+            
+            // Show QR webpage link prominently
+            const baseURL = process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL 
+                ? process.env.RENDER_EXTERNAL_URL 
+                : `http://localhost:${process.env.PORT || 10000}`;
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(`🌐 WEB QR CODE: ${baseURL}`);
+            console.log(`📊 DASHBOARD: ${baseURL}/qr`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+            
+            // Generate base64 QR code for web interface
+            try {
+                const qrImageBuffer = await QRCode.toBuffer(qr, {
+                    type: 'png',
+                    width: 300,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                });
+                currentQRCode = qrImageBuffer.toString('base64');
+                connectionStatus = 'connecting';
+            } catch (error) {
+                console.error('❌ Error generating web QR code:', error.message);
+            }
         }
         if (connection === 'open') {
-            console.log('🚀 WhatsApp Bot Successfully Connected!');
+            console.log('🚀 CloudNextra Bot Successfully Connected!');
             console.log('🤖 Bot Status: Online and Ready');
-            console.log('📋 Quick Commands: .panel | .sticker | .toimg | .time | .pass');
-            console.log('ℹ️  Basic Commands: .help | .stats | .ping | .about');
-            console.log('👑 Admin Commands: .ginfo | .tagall | .kick | .promote');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            // Update connection status for web interface
+            connectionStatus = 'connected';
+            currentQRCode = null;
         } else if (connection === 'close') {
+            connectionStatus = 'disconnected';
+            currentQRCode = null;
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('⚠️  Connection Lost. Attempting Reconnection:', shouldReconnect);
             if (shouldReconnect) startBot();
@@ -1985,18 +2021,43 @@ Try \`.ghelp\` for group commands.`;
     });
 }
 
-console.log('🤖 Initializing WhatsApp Bot v3...');
+console.log('🤖 Initializing CloudNextra Bot...');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('🔧 Built with Baileys Library');
 console.log('⚡ Loading modules and establishing connection...\n');
 
 // Health check server for Render
 const server = http.createServer((req, res) => {
+    // Set CORS headers for all requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             status: 'healthy', 
             uptime: Date.now() - startTime,
+            timestamp: new Date().toISOString()
+        }));
+    } else if (req.url === '/' || req.url === '/qr') {
+        // Serve the QR code webpage
+        const fs = require('fs');
+        const path = require('path');
+        try {
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'public', 'qr.html'), 'utf8');
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(htmlContent);
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Error loading QR page');
+        }
+    } else if (req.url === '/qr-data') {
+        // Serve QR code data as JSON
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            qr: currentQRCode,
+            status: connectionStatus,
             timestamp: new Date().toISOString()
         }));
     } else {
@@ -2008,6 +2069,18 @@ const server = http.createServer((req, res) => {
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`🌐 Health check server running on port ${PORT}`);
+    
+    // Show QR webpage URLs for easy access
+    if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
+        console.log(`📱 QR Code Webpage: ${process.env.RENDER_EXTERNAL_URL}`);
+        console.log(`📡 Health Check: ${process.env.RENDER_EXTERNAL_URL}/health`);
+        console.log(`🔗 API Endpoint: ${process.env.RENDER_EXTERNAL_URL}/qr-data`);
+    } else {
+        console.log(`📱 QR Code Webpage: http://localhost:${PORT}`);
+        console.log(`📡 Health Check: http://localhost:${PORT}/health`);
+        console.log(`🔗 API Endpoint: http://localhost:${PORT}/qr-data`);
+    }
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 });
 
 // Self-ping mechanism to keep the service active on Render
