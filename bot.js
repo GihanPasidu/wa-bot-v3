@@ -286,7 +286,7 @@ async function startBot() {
         }
         if (connection === 'open') {
             console.log('✅ Bot connected and ready.');
-            console.log('📋 Commands: .panel | .sticker | .autoread | .anticall | .on | .off');
+            console.log('📋 Commands: .panel | .sticker | .autoread | .anticall | .on | .off | .ghelp');
         } else if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Connection closed. Reconnect:', shouldReconnect);
@@ -414,14 +414,20 @@ async function startBot() {
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
 • \`.on\` / \`.off\` — Turn bot on/off
 
-👑  *Group Commands* (Admin Only)
-• \`.gtest\` — Debug admin status
-• \`.ghelp\` — Show group management commands
-• \`.ginfo\` — Show group information
+👑  *Group Management* (Admin Only)
+• \`.ginfo\` — Group information
+• \`.tagall [message]\` — Tag all members
+• \`.admins\` — List group admins
+• \`.members\` — Member statistics
+• \`.rules\` — Display group rules
 • \`.kick @user\` — Remove member
 • \`.promote @user\` — Make admin
-• \`.demote @user\` — Remove admin
-• \`.lock\` / \`.unlock\` — Lock/unlock group
+• \`.mute [1h]\` — Mute group
+• \`.warn @user\` — Issue warning
+• \`.resetwarns\` — Reset all warnings
+• \`.groupstats\` — Detailed group stats
+• \`.lock\` / \`.unlock\` — Lock group
+• \`.antilink on/off\` — Link protection
 
 📊  *Status*
 • Bot: ${config.botEnabled ? '✅ ON' : '🛑 OFF'}
@@ -531,31 +537,37 @@ Try \`.ghelp\` for group commands.`;
 👑 *Group Management Commands*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 *Info & Settings*
+📊 *Information & Statistics*
 • \`.ginfo\` — Show group information
-• \`.gdesc <text>\` — Change group description
-• \`.gname <text>\` — Change group name
+• \`.admins\` — List all group admins
+• \`.members\` — Show member statistics
+• \`.groupstats\` — Detailed group statistics
+• \`.rules\` — Display group rules
 
 👥 *Member Management*
+• \`.tagall [message]\` — Tag all members with message
 • \`.kick @user\` — Remove member from group
 • \`.promote @user\` — Make member admin
 • \`.demote @user\` — Remove admin privileges
-• \`.invite <number>\` — Add member by number
+• \`.invite <number>\` — Add member by phone number
 
-🔇 *Moderation*
+� *Group Settings*
+• \`.gname <text>\` — Change group name
+• \`.gdesc <text>\` — Change group description
+• \`.lock\` — Lock group (only admins can send messages)
+• \`.unlock\` — Unlock group (all members can send)
+
+�🔇 *Moderation & Safety*
 • \`.mute <duration>\` — Mute group (5m, 1h, 1d, 1w)
 • \`.unmute\` — Unmute group
-• \`.mutestatus\` — Check mute status
-• \`.warn @user\` — Warn a member (auto-kick after 3 warnings)
+• \`.mutestatus\` — Check current mute status
+• \`.warn @user\` — Issue warning to member
 • \`.warns @user\` — Check member warning count
-• \`.clearwarns @user\` — Clear member warnings
-
-⚙️ *Group Settings*
-• \`.lock\` — Lock group (only admins can send messages)
-• \`.unlock\` — Unlock group
+• \`.clearwarns @user\` — Clear specific member warnings
+• \`.resetwarns\` — Reset all group warnings
 • \`.antilink on/off\` — Toggle anti-link protection
 
-ℹ️ *Note:* All commands require admin privileges.`;
+ℹ️ *Note:* All commands require admin privileges except \`.rules\`, \`.admins\`, and \`.members\`.`;
                         await sock.sendMessage(from, { text: helpText }, { quoted: msg });
                         break;
                     }
@@ -941,6 +953,222 @@ Try \`.ghelp\` for group commands.`;
                         } else {
                             const status = isAntilinkEnabled(from) ? 'enabled' : 'disabled';
                             await sock.sendMessage(from, { text: `ℹ️ Antilink protection is currently ${status}.\n\nUsage: \`.antilink on\` or \`.antilink off\`` }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.tagall': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const participants = groupMetadata.participants;
+                            const message = fullCommand.replace('.tagall', '').trim() || 'Attention everyone!';
+                            
+                            let tagText = `📢 *Group Announcement*\n\n${message}\n\n`;
+                            const mentions = [];
+                            
+                            for (const participant of participants) {
+                                tagText += `@${participant.id.split('@')[0]} `;
+                                mentions.push(participant.id);
+                            }
+                            
+                            await sock.sendMessage(from, { 
+                                text: tagText,
+                                mentions: mentions 
+                            }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to tag all members.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.admins': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const admins = groupMetadata.participants.filter(p => 
+                                p.admin === 'admin' || p.admin === 'superadmin' || p.admin === true || p.admin === 'true'
+                            );
+                            
+                            if (admins.length === 0) {
+                                await sock.sendMessage(from, { text: '❌ No admins found in this group.' }, { quoted: msg });
+                                break;
+                            }
+                            
+                            let adminText = `👑 *Group Admins (${admins.length})*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                            for (let i = 0; i < admins.length; i++) {
+                                const admin = admins[i];
+                                const number = admin.id.split('@')[0];
+                                const role = admin.admin === 'superadmin' ? 'Owner' : 'Admin';
+                                adminText += `${i + 1}. @${number} (${role})\n`;
+                            }
+                            
+                            await sock.sendMessage(from, { 
+                                text: adminText,
+                                mentions: admins.map(a => a.id)
+                            }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to get admin list.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.members': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const participants = groupMetadata.participants;
+                            const admins = participants.filter(p => 
+                                p.admin === 'admin' || p.admin === 'superadmin' || p.admin === true || p.admin === 'true'
+                            );
+                            const members = participants.filter(p => !p.admin);
+                            
+                            const statsText = `👥 *Member Statistics*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 **Total Members:** ${participants.length}
+👑 **Admins:** ${admins.length}
+👤 **Regular Members:** ${members.length}
+📅 **Group Created:** ${new Date(groupMetadata.creation * 1000).toLocaleDateString()}
+
+📋 **Group Name:** ${groupMetadata.subject}`;
+                            
+                            await sock.sendMessage(from, { text: statsText }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to get member statistics.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.rules': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const rulesText = `📋 *Group Rules*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ **Be Respectful** - Treat all members with respect and kindness
+
+2️⃣ **No Spam** - Avoid repetitive or unnecessary messages
+
+3️⃣ **Stay On Topic** - Keep conversations relevant to the group purpose
+
+4️⃣ **No Inappropriate Content** - No offensive, adult, or illegal content
+
+5️⃣ **Follow Admin Instructions** - Respect admin decisions and warnings
+
+6️⃣ **No Self-Promotion** - Don't advertise without permission
+
+7️⃣ **Use Proper Language** - Communicate clearly and avoid excessive profanity
+
+⚠️ **Warning System:**
+• 1st Warning: Verbal warning
+• 2nd Warning: Temporary restrictions
+• 3rd Warning: Removal from group
+
+📞 **Contact Admins:** Use .admins to see group administrators
+
+💡 **Remember:** These rules help maintain a positive environment for everyone!`;
+                        
+                        await sock.sendMessage(from, { text: rulesText }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.resetwarns': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Clear all warnings for this group
+                        warnings.delete(from);
+                        await sock.sendMessage(from, { text: '✅ All warnings have been reset for this group.' }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.groupstats': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const groupMetadata = await sock.groupMetadata(from);
+                            const participants = groupMetadata.participants;
+                            const admins = participants.filter(p => 
+                                p.admin === 'admin' || p.admin === 'superadmin' || p.admin === true || p.admin === 'true'
+                            );
+                            const members = participants.filter(p => !p.admin);
+                            
+                            // Get warning stats
+                            const groupWarnings = warnings.get(from) || new Map();
+                            const totalWarnings = Array.from(groupWarnings.values()).reduce((sum, count) => sum + count, 0);
+                            const warnedUsers = groupWarnings.size;
+                            
+                            // Get mute status
+                            const muteInfo = getMuteInfo(from);
+                            const muteStatus = muteInfo ? `🔇 Muted (${muteInfo.remaining} remaining)` : '🔊 Not muted';
+                            
+                            // Get antilink status
+                            const antilinkStatus = isAntilinkEnabled(from) ? '🚫 Enabled' : '✅ Disabled';
+                            
+                            const detailedStats = `📊 *Detailed Group Statistics*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 **Group Info:**
+• Name: ${groupMetadata.subject}
+• ID: ${from}
+• Created: ${new Date(groupMetadata.creation * 1000).toLocaleDateString()}
+• Description: ${groupMetadata.desc ? 'Set' : 'Not set'}
+
+👥 **Membership:**
+• Total Members: ${participants.length}
+• Admins: ${admins.length}
+• Regular Members: ${members.length}
+
+⚙️ **Settings:**
+• Mute Status: ${muteStatus}
+• Antilink: ${antilinkStatus}
+• Who can edit info: ${groupMetadata.restrict ? 'Admins only' : 'All members'}
+• Who can send messages: ${groupMetadata.announce ? 'Admins only' : 'All members'}
+
+⚠️ **Moderation:**
+• Total Warnings Issued: ${totalWarnings}
+• Users with Warnings: ${warnedUsers}
+
+🤖 **Bot Status:**
+• Bot Active: ✅ Yes
+• Auto-read: ${config.autoRead ? '✅ On' : '❌ Off'}
+• Anti-call: ${config.antiCall ? '✅ On' : '❌ Off'}`;
+                            
+                            await sock.sendMessage(from, { text: detailedStats }, { quoted: msg });
+                        } catch (error) {
+                            await sock.sendMessage(from, { text: '❌ Failed to get detailed group statistics.' }, { quoted: msg });
                         }
                         break;
                     }
