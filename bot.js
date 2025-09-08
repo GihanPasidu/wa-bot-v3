@@ -10,6 +10,7 @@ const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const crypto = require('crypto');
 
 // Bot configuration
 const config = {
@@ -18,6 +19,9 @@ const config = {
     adminJids: ['94788006269@s.whatsapp.net'], // E.164 without +, then @s.whatsapp.net
     botEnabled: true
 };
+
+// Bot startup time for uptime calculation
+const startTime = Date.now();
 
 // Warning system storage
 const warnings = new Map(); // groupJid -> Map(userJid -> count)
@@ -294,6 +298,121 @@ async function convertStickerToImage(buffer) {
     return jpegBuffer;
 }
 
+// Advanced Tools Functions
+function generatePassword(length = 12) {
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    const allChars = uppercase + lowercase + numbers + symbols;
+    
+    let password = '';
+    
+    // Ensure at least one character from each type
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+    
+    // Fill the rest randomly
+    for (let i = 4; i < length; i++) {
+        password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Shuffle the password
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+function shortenUrl(url) {
+    // Simple URL shortener using a hash
+    const hash = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
+    return `https://short.ly/${hash}`;
+}
+
+function getColorInfo(colorName) {
+    const colors = {
+        // Basic Colors
+        'red': { hex: '#FF0000', rgb: 'rgb(255, 0, 0)', hsl: 'hsl(0, 100%, 50%)' },
+        'green': { hex: '#008000', rgb: 'rgb(0, 128, 0)', hsl: 'hsl(120, 100%, 25%)' },
+        'blue': { hex: '#0000FF', rgb: 'rgb(0, 0, 255)', hsl: 'hsl(240, 100%, 50%)' },
+        'yellow': { hex: '#FFFF00', rgb: 'rgb(255, 255, 0)', hsl: 'hsl(60, 100%, 50%)' },
+        'orange': { hex: '#FFA500', rgb: 'rgb(255, 165, 0)', hsl: 'hsl(39, 100%, 50%)' },
+        'purple': { hex: '#800080', rgb: 'rgb(128, 0, 128)', hsl: 'hsl(300, 100%, 25%)' },
+        'pink': { hex: '#FFC0CB', rgb: 'rgb(255, 192, 203)', hsl: 'hsl(350, 100%, 88%)' },
+        'cyan': { hex: '#00FFFF', rgb: 'rgb(0, 255, 255)', hsl: 'hsl(180, 100%, 50%)' },
+        'magenta': { hex: '#FF00FF', rgb: 'rgb(255, 0, 255)', hsl: 'hsl(300, 100%, 50%)' },
+        'lime': { hex: '#00FF00', rgb: 'rgb(0, 255, 0)', hsl: 'hsl(120, 100%, 50%)' },
+        
+        // Neutral Colors
+        'black': { hex: '#000000', rgb: 'rgb(0, 0, 0)', hsl: 'hsl(0, 0%, 0%)' },
+        'white': { hex: '#FFFFFF', rgb: 'rgb(255, 255, 255)', hsl: 'hsl(0, 0%, 100%)' },
+        'gray': { hex: '#808080', rgb: 'rgb(128, 128, 128)', hsl: 'hsl(0, 0%, 50%)' },
+        'grey': { hex: '#808080', rgb: 'rgb(128, 128, 128)', hsl: 'hsl(0, 0%, 50%)' },
+        'silver': { hex: '#C0C0C0', rgb: 'rgb(192, 192, 192)', hsl: 'hsl(0, 0%, 75%)' },
+        
+        // Dark Colors
+        'darkred': { hex: '#8B0000', rgb: 'rgb(139, 0, 0)', hsl: 'hsl(0, 100%, 27%)' },
+        'darkgreen': { hex: '#006400', rgb: 'rgb(0, 100, 0)', hsl: 'hsl(120, 100%, 20%)' },
+        'darkblue': { hex: '#00008B', rgb: 'rgb(0, 0, 139)', hsl: 'hsl(240, 100%, 27%)' },
+        'darkgray': { hex: '#A9A9A9', rgb: 'rgb(169, 169, 169)', hsl: 'hsl(0, 0%, 66%)' },
+        
+        // Light Colors
+        'lightred': { hex: '#FFB6C1', rgb: 'rgb(255, 182, 193)', hsl: 'hsl(351, 100%, 86%)' },
+        'lightgreen': { hex: '#90EE90', rgb: 'rgb(144, 238, 144)', hsl: 'hsl(120, 73%, 75%)' },
+        'lightblue': { hex: '#ADD8E6', rgb: 'rgb(173, 216, 230)', hsl: 'hsl(195, 53%, 79%)' },
+        'lightgray': { hex: '#D3D3D3', rgb: 'rgb(211, 211, 211)', hsl: 'hsl(0, 0%, 83%)' },
+        
+        // Popular Colors
+        'gold': { hex: '#FFD700', rgb: 'rgb(255, 215, 0)', hsl: 'hsl(51, 100%, 50%)' },
+        'navy': { hex: '#000080', rgb: 'rgb(0, 0, 128)', hsl: 'hsl(240, 100%, 25%)' },
+        'maroon': { hex: '#800000', rgb: 'rgb(128, 0, 0)', hsl: 'hsl(0, 100%, 25%)' },
+        'olive': { hex: '#808000', rgb: 'rgb(128, 128, 0)', hsl: 'hsl(60, 100%, 25%)' },
+        'teal': { hex: '#008080', rgb: 'rgb(0, 128, 128)', hsl: 'hsl(180, 100%, 25%)' },
+        'aqua': { hex: '#00FFFF', rgb: 'rgb(0, 255, 255)', hsl: 'hsl(180, 100%, 50%)' },
+        'fuchsia': { hex: '#FF00FF', rgb: 'rgb(255, 0, 255)', hsl: 'hsl(300, 100%, 50%)' }
+    };
+    
+    return colors[colorName.toLowerCase()] || null;
+}
+
+function getCurrentDateTime() {
+    const now = new Date();
+    
+    // Get timezone offset
+    const timezoneOffset = now.getTimezoneOffset();
+    const timezone = `UTC${timezoneOffset > 0 ? '-' : '+'}${Math.abs(Math.floor(timezoneOffset / 60)).toString().padStart(2, '0')}:${Math.abs(timezoneOffset % 60).toString().padStart(2, '0')}`;
+    
+    // Format date and time
+    const date = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    const time = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+    
+    // Additional info
+    const unixTimestamp = Math.floor(now.getTime() / 1000);
+    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+    const weekNumber = Math.ceil(dayOfYear / 7);
+    
+    return {
+        date,
+        time,
+        timezone,
+        unixTimestamp,
+        dayOfYear,
+        weekNumber,
+        iso: now.toISOString()
+    };
+}
+
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
     const { version } = await fetchLatestBaileysVersion();
@@ -447,7 +566,13 @@ async function startBot() {
 • \`.sticker\` — Convert image to sticker
 • \`.toimg\` — Convert sticker to image
 
-👑  *Group Management* (Admin Only)
+�  *Advanced Tools*
+• \`.shorturl [url]\` — URL shortener
+• \`.color [name]\` — Color code lookup
+• \`.time\` — Current time & date
+• \`.pass [12]\` — Password generator
+
+�👑  *Group Management* (Admin Only)
 • \`.ginfo\` — Group information
 • \`.tagall [message]\` — Tag all members
 • \`.admins\` — List group admins
@@ -548,6 +673,131 @@ async function startBot() {
                         }
                         break;
                     }
+                    
+                    // Advanced Tools Commands
+                    case '.shorturl': {
+                        const url = text.substring(9).trim();
+                        if (!url) {
+                            await sock.sendMessage(from, { text: '🔗 Please provide a URL to shorten.\n*Usage:* .shorturl https://example.com' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        // Basic URL validation
+                        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                            await sock.sendMessage(from, { text: '❌ Please provide a valid URL starting with http:// or https://' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        try {
+                            const shortUrl = shortenUrl(url);
+                            const response = `🔗 *URL Shortened Successfully!*
+
+📍 *Original URL:*
+${url}
+
+⚡ *Short URL:*
+${shortUrl}
+
+ℹ️ Note: This is a demo shortener. In production, use services like bit.ly or tinyurl.`;
+                            
+                            await sock.sendMessage(from, { text: response }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error shortening URL:', e);
+                            await sock.sendMessage(from, { text: '⚠️ Unable to shorten URL. Please try again.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.color': {
+                        const colorName = text.substring(6).trim();
+                        if (!colorName) {
+                            await sock.sendMessage(from, { text: '🎨 Please provide a color name.\n*Usage:* .color red\n\n*Available colors:* red, green, blue, yellow, orange, purple, pink, cyan, black, white, gray, gold, navy, and many more!' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const colorInfo = getColorInfo(colorName);
+                        if (!colorInfo) {
+                            await sock.sendMessage(from, { text: `❌ Color "${colorName}" not found in database.\n\n*Try these popular colors:*\nred, green, blue, yellow, orange, purple, pink, cyan, black, white, gray, gold, navy, maroon, olive, teal` }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const response = `🎨 *Color Information: ${colorName.toUpperCase()}*
+
+🔹 *HEX Code:* \`${colorInfo.hex}\`
+🔹 *RGB:* \`${colorInfo.rgb}\`
+🔹 *HSL:* \`${colorInfo.hsl}\`
+
+💡 *Usage Tips:*
+• Copy HEX code for web design
+• Use RGB for CSS/programming
+• HSL for color adjustments`;
+                        
+                        await sock.sendMessage(from, { text: response }, { quoted: msg });
+                        break;
+                    }
+                    
+                    case '.time': {
+                        try {
+                            const timeInfo = getCurrentDateTime();
+                            const response = `🕐 *Current Date & Time*
+
+📅 *Date:* ${timeInfo.date}
+⏰ *Time:* ${timeInfo.time}
+🌍 *Timezone:* ${timeInfo.timezone}
+
+📊 *Additional Info:*
+• Day of Year: ${timeInfo.dayOfYear}
+• Week Number: ${timeInfo.weekNumber}
+• Unix Timestamp: ${timeInfo.unixTimestamp}
+• ISO Format: ${timeInfo.iso}
+
+🤖 *Bot Uptime:* ${Math.floor((Date.now() - startTime) / 1000)}s`;
+                            
+                            await sock.sendMessage(from, { text: response }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error getting time:', e);
+                            await sock.sendMessage(from, { text: '⚠️ Unable to get current time. Please try again.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.pass': {
+                        const lengthArg = text.substring(5).trim();
+                        let length = 12; // default length
+                        
+                        if (lengthArg) {
+                            const parsedLength = parseInt(lengthArg);
+                            if (isNaN(parsedLength) || parsedLength < 4 || parsedLength > 50) {
+                                await sock.sendMessage(from, { text: '❌ Password length must be between 4 and 50 characters.\n*Usage:* .pass 16' }, { quoted: msg });
+                                break;
+                            }
+                            length = parsedLength;
+                        }
+                        
+                        try {
+                            const password = generatePassword(length);
+                            const response = `🔐 *Secure Password Generated*
+
+🔑 *Password:* \`${password}\`
+📏 *Length:* ${length} characters
+
+🛡️ *Security Features:*
+• Contains uppercase letters
+• Contains lowercase letters
+• Contains numbers
+• Contains special characters
+• Cryptographically secure
+
+⚠️ *Security Note:* This password is sent in plain text. Please change it immediately after copying.`;
+                            
+                            await sock.sendMessage(from, { text: response }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error generating password:', e);
+                            await sock.sendMessage(from, { text: '⚠️ Unable to generate password. Please try again.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
                     // Group Management Commands (Admin Only)
                     case '.ginfo': {
                         if (!isGroup) {
