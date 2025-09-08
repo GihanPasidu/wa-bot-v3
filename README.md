@@ -44,6 +44,12 @@
 - Anti-link protection for groups
 - Secure auth data handling (not stored in git)
 
+## Prerequisites
+
+- **Node.js 20+** (required for Baileys library)
+- **npm 9+**
+- WhatsApp account for authentication
+
 ## Setup
 
 1. Clone the repository:

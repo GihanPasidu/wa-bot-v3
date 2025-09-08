@@ -4,8 +4,8 @@
   "description": "CloudNextra Bot - Advanced WhatsApp Bot with comprehensive features",
   "main": "bot.js",
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
   },
   "scripts": {
     "start": "node bot.js",
