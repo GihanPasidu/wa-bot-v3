@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: whatsapp-bot-v3
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: RENDER_EXTERNAL_URL
+        value: https://whatsapp-bot-v3.onrender.com
+    autoDeploy: true
+    healthCheckPath: /health

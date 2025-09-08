@@ -12,6 +12,7 @@ const path = require('path');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const axios = require('axios');
+const http = require('http');
 
 // Bot configuration
 const config = {
@@ -1988,6 +1989,47 @@ console.log('🤖 Initializing WhatsApp Bot v3...');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('🔧 Built with Baileys Library');
 console.log('⚡ Loading modules and establishing connection...\n');
+
+// Health check server for Render
+const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'healthy', 
+            uptime: Date.now() - startTime,
+            timestamp: new Date().toISOString()
+        }));
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+    }
+});
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+    console.log(`🌐 Health check server running on port ${PORT}`);
+});
+
+// Self-ping mechanism to keep the service active on Render
+let selfPingInterval = null;
+if (process.env.NODE_ENV === 'production') {
+    const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    
+    selfPingInterval = setInterval(async () => {
+        try {
+            const response = await axios.get(`${SELF_PING_URL}/health`, {
+                timeout: 10000,
+                headers: { 'User-Agent': 'WhatsApp-Bot-KeepAlive' }
+            });
+            console.log(`🏓 Self-ping successful: ${response.status} - ${new Date().toISOString()}`);
+        } catch (error) {
+            console.log(`⚠️ Self-ping failed: ${error.message} - ${new Date().toISOString()}`);
+        }
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
+    console.log('🏓 Self-ping mechanism activated (5-minute interval)');
+}
+
 startBot().catch((e) => {
     console.error('❌ Failed to start bot:', e);
     process.exit(1);
@@ -1999,8 +2041,15 @@ process.on('SIGINT', () => {
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
-    console.log('👋 Bot shutdown complete. Goodbye!');
-    process.exit(0);
+    if (selfPingInterval) {
+        clearInterval(selfPingInterval);
+        console.log('🏓 Self-ping mechanism stopped');
+    }
+    server.close(() => {
+        console.log('🌐 Health check server closed');
+        console.log('👋 Bot shutdown complete. Goodbye!');
+        process.exit(0);
+    });
 });
 
 process.on('SIGTERM', () => {
@@ -2009,6 +2058,13 @@ process.on('SIGTERM', () => {
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
-    console.log('👋 Bot terminated successfully. Goodbye!');
-    process.exit(0);
+    if (selfPingInterval) {
+        clearInterval(selfPingInterval);
+        console.log('🏓 Self-ping mechanism stopped');
+    }
+    server.close(() => {
+        console.log('🌐 Health check server closed');
+        console.log('👋 Bot terminated successfully. Goodbye!');
+        process.exit(0);
+    });
 });

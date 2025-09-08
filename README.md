@@ -72,11 +72,84 @@ node bot.js
 ## Dependencies
 
 - `@whiskeysockets/baileys` - WhatsApp Web API
+- `axios` - HTTP client for TinyURL API
 - `sharp` - Image processing for stickers
 - `pino` - Logging framework
 - `qrcode-terminal` - QR code display
-- `axios` - HTTP client for TinyURL API
 - `crypto` - Password generation
+
+## Deployment on Render
+
+### Prerequisites
+- GitHub repository with your bot code
+- Render account (free tier available)
+
+### Step-by-Step Deployment
+
+1. **Prepare Your Repository**
+   ```bash
+   git add .
+   git commit -m "Prepare for Render deployment"
+   git push origin main
+   ```
+
+2. **Deploy to Render**
+   - Go to [Render Dashboard](https://dashboard.render.com/)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repository
+   - Select your `wa-bot-v3` repository
+
+3. **Configure Deployment Settings**
+   - **Name**: `whatsapp-bot-v3`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Instance Type**: `Free` (or paid for better performance)
+
+4. **Set Environment Variables**
+   In Render dashboard, add these environment variables:
+   ```
+   NODE_ENV=production
+   PORT=10000
+   ADMIN_JIDS=your-number@s.whatsapp.net
+   AUTO_READ=false
+   ANTI_CALL=true
+   BOT_ENABLED=true
+   ```
+
+5. **Deploy and Monitor**
+   - Click "Create Web Service"
+   - Monitor the build logs
+   - Wait for deployment to complete
+   - Your bot will be available at `https://your-app-name.onrender.com`
+
+### First-Time Setup After Deployment
+
+1. **Scan QR Code**
+   - Check Render logs for QR code
+   - Scan with WhatsApp to authenticate
+   - Bot will start automatically after authentication
+
+2. **Test Bot Commands**
+   - Send `.ping` to test connectivity
+   - Use `.help` to see all available commands
+   - Verify all features work correctly
+
+### Production Considerations
+
+- **Persistent Storage**: Auth data will persist across deployments
+- **Health Checks**: Automatic health monitoring at `/health`
+- **Keep-Alive**: Self-ping every 5 minutes to prevent service sleeping
+- **Auto-Deploy**: Automatically deploys on GitHub pushes
+- **Scaling**: Upgrade to paid plans for better performance
+- **Monitoring**: Use Render logs and metrics for monitoring
+
+### Troubleshooting
+
+- **Build Failures**: Check Node.js version compatibility
+- **Memory Issues**: Consider upgrading to paid tier
+- **Connection Issues**: Verify WhatsApp authentication
+- **Command Errors**: Check admin JID configuration
 
 ## File Structure
 

@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "description": "WhatsApp Bot with QR code scanning and bot commands",
   "main": "bot.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "dev": "nodemon bot.js",
+    "build": "echo 'No build step required'",
+    "postinstall": "echo 'Dependencies installed successfully'"
   },
   "keywords": [
     "whatsapp",
