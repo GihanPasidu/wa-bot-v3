@@ -2088,19 +2088,30 @@ let selfPingInterval = null;
 if (process.env.NODE_ENV === 'production') {
     const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     
+    // More aggressive keep-alive: ping every 3 minutes instead of 5
     selfPingInterval = setInterval(async () => {
         try {
             const response = await axios.get(`${SELF_PING_URL}/health`, {
                 timeout: 10000,
-                headers: { 'User-Agent': 'WhatsApp-Bot-KeepAlive' }
+                headers: { 
+                    'User-Agent': 'WhatsApp-Bot-KeepAlive',
+                    'Cache-Control': 'no-cache'
+                }
             });
-            console.log(`🏓 Self-ping successful: ${response.status} - ${new Date().toISOString()}`);
+            console.log(`🏓 Keep-alive ping: ${response.status} - ${new Date().toISOString()}`);
         } catch (error) {
-            console.log(`⚠️ Self-ping failed: ${error.message} - ${new Date().toISOString()}`);
+            console.log(`⚠️ Keep-alive ping failed: ${error.message} - ${new Date().toISOString()}`);
+            // Try alternative endpoint if health fails
+            try {
+                await axios.get(`${SELF_PING_URL}/`, { timeout: 5000 });
+                console.log(`🏓 Fallback ping successful - ${new Date().toISOString()}`);
+            } catch (fallbackError) {
+                console.log(`❌ Both ping attempts failed - ${new Date().toISOString()}`);
+            }
         }
-    }, 5 * 60 * 1000); // Every 5 minutes
+    }, 3 * 60 * 1000); // Every 3 minutes for better reliability
     
-    console.log('🏓 Self-ping mechanism activated (5-minute interval)');
+    console.log('🏓 Enhanced keep-alive mechanism activated (3-minute interval)');
 }
 
 startBot().catch((e) => {
