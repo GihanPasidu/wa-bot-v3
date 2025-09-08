@@ -7,7 +7,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node bot.js",
+    "start": "node start.js",
+    "start:direct": "node bot.js",
     "dev": "nodemon bot.js",
     "setup": "node setup-apis.js",
     "setup-apis": "node setup-apis.js"

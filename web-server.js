@@ -234,17 +234,52 @@ function clearQRCode() {
     console.log('🗑️ QR Code cleared');
 }
 
-// Start web server
+// Track server instance to prevent multiple starts
+let serverInstance = null;
+
+// Start web server (only once)
 function startWebServer() {
-    return new Promise((resolve) => {
-        const server = app.listen(PORT, () => {
+    return new Promise((resolve, reject) => {
+        // If server is already running, return existing instance
+        if (serverInstance) {
+            console.log('🌐 Web server already running');
+            resolve(serverInstance);
+            return;
+        }
+
+        const server = app.listen(PORT, (err) => {
+            if (err) {
+                if (err.code === 'EADDRINUSE') {
+                    console.log(`⚠️ Port ${PORT} is already in use. Server might already be running.`);
+                    resolve(null); // Don't fail, just continue
+                } else {
+                    reject(err);
+                }
+                return;
+            }
+
+            serverInstance = server;
             console.log('🌐 Web interface running at:');
             console.log(`   Local: http://localhost:${PORT}`);
             if (process.env.RAILWAY_STATIC_URL) {
                 console.log(`   Railway: ${process.env.RAILWAY_STATIC_URL}`);
             }
+            if (process.env.RENDER_EXTERNAL_URL) {
+                console.log(`   Render: ${process.env.RENDER_EXTERNAL_URL}`);
+            }
             console.log('📱 Open this URL to scan QR code for WhatsApp connection');
             resolve(server);
+        });
+
+        // Handle server errors
+        server.on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.log(`⚠️ Port ${PORT} is already in use. Continuing without starting new server.`);
+                resolve(null);
+            } else {
+                console.error('❌ Web server error:', err);
+                reject(err);
+            }
         });
     });
 }

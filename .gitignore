@@ -4,6 +4,9 @@
 # Environment variables
 .env
 
+# Process ID files
+.bot.pid
+
 # Node modules
 node_modules/
 

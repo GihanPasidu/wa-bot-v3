@@ -10,7 +10,8 @@ const config = {
         adminJids: [process.env.ADMIN_PHONE ? `${process.env.ADMIN_PHONE}@s.whatsapp.net` : '94752735513@s.whatsapp.net'],
         autoRead: process.env.AUTO_READ === 'true',
         antiCall: process.env.ANTI_CALL === 'true',
-        botEnabled: process.env.BOT_ENABLED !== 'false'
+        botEnabled: process.env.BOT_ENABLED !== 'false',
+        showConsoleQR: process.env.SHOW_CONSOLE_QR !== 'false' // Default true, set to 'false' to disable
     },
 
     // 🌤️ Weather API Configuration

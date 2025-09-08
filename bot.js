@@ -312,9 +312,15 @@ async function createStickerFromImageBuffer(buffer) {
 }
 
 async function startBot() {
-    // Start web server first
-    await startWebServer();
-    updateBotStatus('Starting WhatsApp Bot...');
+    // Start web server first (with error handling)
+    try {
+        await startWebServer();
+        updateBotStatus('Starting WhatsApp Bot...');
+    } catch (error) {
+        console.log('⚠️ Web server startup issue:', error.message);
+        console.log('🔄 Continuing bot startup...');
+        updateBotStatus('Starting WhatsApp Bot... (Web server issue)');
+    }
     
     const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
     const { version } = await fetchLatestBaileysVersion();
@@ -331,10 +337,30 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
-            console.log('🔐 QR received — scan with WhatsApp to link:');
-            qrcode.generate(qr, { small: true });
-            console.log('\n📱 Web Interface: Open the web URL to scan QR code');
-            console.log('📲 Mobile: Open WhatsApp → Linked devices → Link a device.');
+            console.log('🔐 QR Code received!');
+            console.log('┌─────────────────────────────────────────┐');
+            console.log('│  📱 SCAN QR CODE TO CONNECT WHATSAPP   │');
+            console.log('├─────────────────────────────────────────┤');
+            console.log('│  1. Open WhatsApp on your phone        │');
+            console.log('│  2. Go to Settings → Linked Devices    │');
+            console.log('│  3. Tap "Link a Device"                 │');
+            console.log('│  4. Scan QR code from web interface     │');
+            console.log('└─────────────────────────────────────────┘');
+            console.log('🌐 Web QR: Open http://localhost:3000 to scan');
+            console.log('� Tip: Use web interface for easier scanning\n');
+            
+            // Only show console QR if enabled (default: true)
+            if (botConfig.showConsoleQR) {
+                try {
+                    console.log('📱 Console QR (compact):');
+                    qrcode.generate(qr, { small: true, errorCorrectionLevel: 'L' });
+                    console.log('');
+                } catch (err) {
+                    console.log('⚠️ Console QR display error (use web interface)');
+                }
+            } else {
+                console.log('📱 Console QR disabled - Use web interface to scan');
+            }
             
             // Update web interface with QR code
             updateQRCode(qr);
