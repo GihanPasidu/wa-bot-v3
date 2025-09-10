@@ -45,6 +45,107 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
+// Persistent auth storage for Render deployments
+const PERSISTENT_AUTH_KEYS = [
+    'BAILEYS_CREDS',
+    'BAILEYS_KEYS'
+];
+
+// Enhanced auth persistence with multiple storage methods
+function backupAuthToEnv(authState) {
+    try {
+        if (authState.creds) {
+            console.log('🔐 Backing up authentication credentials...');
+            // Store in a persistent location that survives deployments
+            const authBackupDir = '/tmp/auth-backup';
+            if (!fs.existsSync(authBackupDir)) {
+                fs.mkdirSync(authBackupDir, { recursive: true });
+            }
+            
+            // Save to persistent tmp location
+            fs.writeFileSync(path.join(authBackupDir, 'creds-backup.json'), JSON.stringify(authState.creds, null, 2));
+            
+            // Also save a timestamp
+            fs.writeFileSync(path.join(authBackupDir, 'backup-timestamp.txt'), Date.now().toString());
+            
+            console.log('✅ Authentication data backed up successfully');
+        }
+    } catch (error) {
+        console.error('❌ Error backing up auth data:', error);
+    }
+}
+
+function restoreAuthFromBackup() {
+    try {
+        const authBackupDir = '/tmp/auth-backup';
+        const credsBackupPath = path.join(authBackupDir, 'creds-backup.json');
+        const timestampPath = path.join(authBackupDir, 'backup-timestamp.txt');
+        
+        if (fs.existsSync(credsBackupPath)) {
+            const backupAge = Date.now() - parseInt(fs.readFileSync(timestampPath, 'utf8') || '0');
+            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+            
+            if (backupAge < maxAge) {
+                console.log('🔄 Restoring authentication from backup...');
+                const credsData = JSON.parse(fs.readFileSync(credsBackupPath, 'utf8'));
+                return { creds: credsData };
+            } else {
+                console.log('⏰ Auth backup is too old, will generate new QR code');
+                // Clean up old backup
+                fs.unlinkSync(credsBackupPath);
+                fs.unlinkSync(timestampPath);
+            }
+        }
+        
+        console.log('📝 No valid auth backup found, will need fresh authentication');
+        return null;
+    } catch (error) {
+        console.error('❌ Error restoring auth backup:', error);
+        return null;
+    }
+}
+
+// Enhanced auth state management with persistence
+async function getAuthState() {
+    const authDir = './auth';
+    
+    // Ensure auth directory exists
+    if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+        console.log('📁 Created auth directory');
+    }
+    
+    try {
+        // First try to use existing auth files
+        const authState = await useMultiFileAuthState(authDir);
+        
+        // Check if we have valid credentials
+        if (authState.creds && Object.keys(authState.creds).length > 0) {
+            console.log('✅ Using existing authentication data');
+            return authState;
+        }
+        
+        // If no valid local auth, try to restore from backup
+        const restoredAuth = restoreAuthFromBackup();
+        if (restoredAuth) {
+            // Write restored data to files
+            fs.writeFileSync(path.join(authDir, 'creds.json'), JSON.stringify(restoredAuth.creds, null, 2));
+            console.log('🔄 Restored authentication from backup storage');
+            
+            // Return fresh auth state with restored data
+            return await useMultiFileAuthState(authDir);
+        }
+        
+        console.log('🆕 No existing authentication found, will generate new QR code');
+        return authState;
+        
+    } catch (error) {
+        console.error('❌ Error setting up auth state:', error);
+        // Fallback to fresh auth state
+        return await useMultiFileAuthState(authDir);
+    }
+}
+
 // Warning system functions
 function addWarning(groupJid, userJid) {
     if (!warnings.has(groupJid)) {
@@ -663,7 +764,8 @@ function getCurrentDateTime() {
 }
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
+    // Use enhanced auth state management with persistence
+    const { state, saveCreds } = await getAuthState();
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
@@ -674,8 +776,15 @@ async function startBot() {
         browser: ['CloudNextra Bot', 'Desktop', '3.0.0']
     });
 
+    // Enhanced credentials saving with backup
+    const originalSaveCreds = saveCreds;
+    const enhancedSaveCreds = async () => {
+        await originalSaveCreds();
+        // Backup auth data for persistence across deployments
+        backupAuthToEnv({ creds: state.creds, keys: state.keys });
+    };
 
-    // QR handling
+    // QR handling with persistence awareness
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
@@ -719,6 +828,14 @@ async function startBot() {
             // Update connection status for web interface
             connectionStatus = 'connected';
             currentQRCode = null;
+            
+            // Backup authentication data on successful connection
+            try {
+                backupAuthToEnv({ creds: state.creds, keys: state.keys });
+                console.log('💾 Authentication data backed up for persistence');
+            } catch (error) {
+                console.error('❌ Failed to backup auth data:', error);
+            }
         } else if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQRCode = null;
@@ -728,7 +845,7 @@ async function startBot() {
         }
     });
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', enhancedSaveCreds);
 
     // Start auto-unmute timer (check every 30 seconds)
     unmuteTimer = setInterval(async () => {
