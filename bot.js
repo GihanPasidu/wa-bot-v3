@@ -36,6 +36,9 @@ const warnings = new Map(); // groupJid -> Map(userJid -> count)
 // Mute system storage
 const mutedGroups = new Map(); // groupJid -> { endTime, reason }
 
+// Individual user mute system storage
+const mutedUsers = new Map(); // groupJid -> Map(userJid -> { endTime, reason })
+
 // Antilink system storage
 const antilinkGroups = new Set(); // groupJid -> boolean
 
@@ -132,6 +135,154 @@ function getMuteInfo(groupJid) {
     };
 }
 
+// Individual user mute system functions
+function muteUser(groupJid, userJid, duration, reason = '') {
+    console.log(`🔇 Attempting to mute user: ${userJid} for ${duration} in group: ${groupJid}`);
+    const muteTime = parseDuration(duration);
+    if (!muteTime) {
+        console.log(`❌ Invalid duration format: ${duration}`);
+        return false;
+    }
+    
+    if (!mutedUsers.has(groupJid)) {
+        mutedUsers.set(groupJid, new Map());
+        console.log(`📝 Created new mute map for group: ${groupJid}`);
+    }
+    
+    const endTime = Date.now() + muteTime;
+    const muteEndDate = new Date(endTime).toISOString();
+    mutedUsers.get(groupJid).set(userJid, { endTime, reason });
+    
+    console.log(`✅ User ${userJid} muted until: ${muteEndDate}, reason: ${reason || 'No reason provided'}`);
+    console.log(`📊 Total muted users in group ${groupJid}: ${mutedUsers.get(groupJid).size}`);
+    
+    return true;
+}
+
+function unmuteUser(groupJid, userJid) {
+    console.log(`🔊 Attempting to unmute user: ${userJid} in group: ${groupJid}`);
+    if (!mutedUsers.has(groupJid)) {
+        console.log(`❌ No muted users found for group: ${groupJid}`);
+        return false;
+    }
+    
+    const groupMutes = mutedUsers.get(groupJid);
+    const wasMuted = groupMutes.has(userJid);
+    const result = groupMutes.delete(userJid);
+    
+    console.log(`${result ? '✅' : '❌'} Unmute result: ${result}, was previously muted: ${wasMuted}`);
+    
+    // Clean up empty group maps
+    if (groupMutes.size === 0) {
+        mutedUsers.delete(groupJid);
+        console.log(`🗑️ Cleaned up empty group mute map for: ${groupJid}`);
+    } else {
+        console.log(`📊 Remaining muted users in group ${groupJid}: ${groupMutes.size}`);
+    }
+    
+    return result;
+}
+
+function isUserMuted(groupJid, userJid) {
+    console.log(`🔍 Checking mute status for user: ${userJid} in group: ${groupJid}`);
+    
+    if (!mutedUsers.has(groupJid)) {
+        console.log(`❌ No muted users found for group: ${groupJid}`);
+        return false;
+    }
+    
+    const groupMutes = mutedUsers.get(groupJid);
+    const muteData = groupMutes.get(userJid);
+    if (!muteData) {
+        console.log(`❌ User ${userJid} not found in muted list for group ${groupJid}`);
+        return false;
+    }
+    
+    const now = Date.now();
+    const timeLeft = muteData.endTime - now;
+    console.log(`⏰ User ${userJid} mute expires in: ${Math.floor(timeLeft / 60000)} minutes`);
+    
+    if (now > muteData.endTime) {
+        console.log(`⏰ Mute expired for user: ${userJid}, removing from muted list`);
+        groupMutes.delete(userJid);
+        if (groupMutes.size === 0) {
+            mutedUsers.delete(groupJid);
+        }
+        return false;
+    }
+    
+    console.log(`✅ User ${userJid} is currently muted`);
+    return true;
+}
+
+function getUserMuteInfo(groupJid, userJid) {
+    if (!mutedUsers.has(groupJid)) return null;
+    
+    const groupMutes = mutedUsers.get(groupJid);
+    const muteData = groupMutes.get(userJid);
+    if (!muteData) return null;
+    
+    const remaining = muteData.endTime - Date.now();
+    if (remaining <= 0) {
+        groupMutes.delete(userJid);
+        if (groupMutes.size === 0) {
+            mutedUsers.delete(groupJid);
+        }
+        return null;
+    }
+    
+    const minutes = Math.floor(remaining / (60 * 1000));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    let timeStr = '';
+    if (days > 0) timeStr += `${days}d `;
+    if (hours % 24 > 0) timeStr += `${hours % 24}h `;
+    if (minutes % 60 > 0) timeStr += `${minutes % 60}m`;
+    
+    return {
+        remaining: timeStr.trim(),
+        reason: muteData.reason
+    };
+}
+
+function getMutedUsersList(groupJid) {
+    if (!mutedUsers.has(groupJid)) return [];
+    
+    const groupMutes = mutedUsers.get(groupJid);
+    const mutedList = [];
+    
+    for (const [userJid, muteData] of groupMutes.entries()) {
+        const remaining = muteData.endTime - Date.now();
+        if (remaining > 0) {
+            const minutes = Math.floor(remaining / (60 * 1000));
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            let timeStr = '';
+            if (days > 0) timeStr += `${days}d `;
+            if (hours % 24 > 0) timeStr += `${hours % 24}h `;
+            if (minutes % 60 > 0) timeStr += `${minutes % 60}m`;
+            
+            mutedList.push({
+                userJid,
+                remaining: timeStr.trim(),
+                reason: muteData.reason
+            });
+        } else {
+            // Clean up expired mutes
+            groupMutes.delete(userJid);
+        }
+    }
+    
+    // Clean up empty group maps
+    if (groupMutes.size === 0) {
+        mutedUsers.delete(groupJid);
+    }
+    
+    return mutedList;
+}
+
 // Antilink system functions
 function enableAntilink(groupJid) {
     antilinkGroups.add(groupJid);
@@ -155,6 +306,7 @@ async function checkAndAutoUnmute(sock) {
     const now = Date.now();
     const expiredGroups = [];
     
+    // Check for expired group mutes
     for (const [groupJid, muteData] of mutedGroups.entries()) {
         if (now > muteData.endTime) {
             expiredGroups.push(groupJid);
@@ -175,6 +327,33 @@ async function checkAndAutoUnmute(sock) {
             console.log(`Auto-unmuted group: ${groupJid}`);
         } catch (error) {
             console.error(`Error auto-unmuting group ${groupJid}:`, error);
+        }
+    }
+    
+    // Check for expired individual user mutes
+    const expiredUsers = [];
+    
+    for (const [groupJid, groupMutes] of mutedUsers.entries()) {
+        for (const [userJid, muteData] of groupMutes.entries()) {
+            if (now > muteData.endTime) {
+                expiredUsers.push({ groupJid, userJid });
+            }
+        }
+    }
+    
+    for (const { groupJid, userJid } of expiredUsers) {
+        try {
+            unmuteUser(groupJid, userJid);
+            
+            // Notify user that their mute has expired
+            await sock.sendMessage(groupJid, { 
+                text: `🔊 @${userJid.split('@')[0]} your mute has expired. You can send messages again.`,
+                mentions: [userJid]
+            });
+            
+            console.log(`Auto-unmuted user ${userJid} in group ${groupJid}`);
+        } catch (error) {
+            console.error(`Error auto-unmuting user ${userJid} in group ${groupJid}:`, error);
         }
     }
 }
@@ -601,6 +780,22 @@ async function startBot() {
                 continue;
             }
 
+            // Check if individual user is muted (block their messages)
+            if (isGroup && isUserMuted(from, senderJid)) {
+                console.log(`🔇 Silently blocking message from muted user: ${senderJid} in group: ${from}`);
+                
+                try {
+                    // Silently delete the muted user's message (no warning message)
+                    await sock.sendMessage(from, { 
+                        delete: msg.key 
+                    });
+                    console.log(`✅ Successfully deleted message from muted user: ${senderJid} (silent mode)`);
+                } catch (error) {
+                    console.error('Error deleting muted user message:', error);
+                }
+                continue;
+            }
+
             // Check for links if antilink is enabled
             if (isGroup && isAntilinkEnabled(from) && !isAdmin && containsLink(body)) {
                 try {
@@ -609,11 +804,9 @@ async function startBot() {
                         delete: msg.key 
                     });
                     
-                    // Send warning message
+                    // Send simple warning message (not a reply)
                     await sock.sendMessage(from, { 
                         text: `🚫 Links are not allowed in this group.` 
-                    }, { 
-                        quoted: msg 
                     });
                 } catch (error) {
                     console.error('Error handling antilink:', error);
@@ -621,17 +814,9 @@ async function startBot() {
                     try {
                         await sock.sendMessage(from, { 
                             text: `🚫 Links are not allowed in this group.` 
-                        }, { 
-                            quoted: msg 
                         });
                     } catch (warningError) {
                         console.error('Error sending antilink warning:', warningError);
-                        // Try to send a simple error message
-                        try {
-                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'antilink warning');
-                        } catch (fallbackError) {
-                            console.error('Failed to send fallback error message:', fallbackError);
-                        }
                     }
                 }
                 continue;
@@ -710,6 +895,7 @@ async function startBot() {
 • \`.kick @user\` — Remove member
 • \`.promote @user\` — Make admin
 • \`.mute [1h]\` — Mute group
+• \`.muteuser @user [1h]\` — Mute individual user
 • \`.warn @user\` — Issue warning
 • \`.resetwarns\` — Reset all warnings
 • \`.groupstats\` — Detailed group stats
@@ -1376,6 +1562,9 @@ Try \`.ghelp\` for group commands.`;
 • \`.mute <duration>\` — Mute group (5m, 1h, 1d, 1w)
 • \`.unmute\` — Unmute group
 • \`.mutestatus\` — Check current mute status
+• \`.muteuser @user <duration> [reason]\` — Mute individual user
+• \`.unmuteuser @user\` — Unmute individual user
+• \`.mutedusers\` — List all muted users
 • \`.warn @user\` — Issue warning to member
 • \`.warns @user\` — Check member warning count
 • \`.clearwarns @user\` — Clear specific member warnings
@@ -1612,6 +1801,128 @@ Try \`.ghelp\` for group commands.`;
                             }
                         } else {
                             await sock.sendMessage(from, { text: 'ℹ️ Group is not currently muted.' }, { quoted: msg });
+                        }
+                        break;
+                    }
+                    
+                    case '.muteuser': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                        if (mentionedJids.length === 0) {
+                            await sock.sendMessage(from, { text: '❌ Please mention a user to mute. Usage: `.muteuser @user <5m|1h|1d|1w> [reason]`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const args = fullCommand.replace('.muteuser', '').trim().split(' ');
+                        const duration = args.find(arg => /^\d+[mhdw]$/i.test(arg));
+                        
+                        if (!duration) {
+                            await sock.sendMessage(from, { text: '❌ Please provide a valid duration. Usage: `.muteuser @user <5m|1h|1d|1w> [reason]`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const reason = args.filter(arg => !arg.includes('@') && !/^\d+[mhdw]$/i.test(arg)).join(' ').trim();
+                        
+                        for (const userJid of mentionedJids) {
+                            // Don't allow muting admins
+                            const targetIsAdmin = await isGroupAdmin(sock, from, userJid);
+                            if (targetIsAdmin) {
+                                await sock.sendMessage(from, { 
+                                    text: `❌ Cannot mute @${userJid.split('@')[0]} as they are a group admin.`,
+                                    mentions: [userJid]
+                                }, { quoted: msg });
+                                continue;
+                            }
+                            
+                            if (muteUser(from, userJid, duration, reason)) {
+                                const muteInfo = getUserMuteInfo(from, userJid);
+                                const reasonText = reason ? ` Reason: ${reason}` : '';
+                                
+                                await sock.sendMessage(from, { 
+                                    text: `🔇 @${userJid.split('@')[0]} has been muted for ${muteInfo.remaining}.${reasonText}`,
+                                    mentions: [userJid]
+                                }, { quoted: msg });
+                            } else {
+                                await sock.sendMessage(from, { 
+                                    text: `❌ Failed to mute @${userJid.split('@')[0]}. Invalid duration format.`,
+                                    mentions: [userJid]
+                                }, { quoted: msg });
+                            }
+                        }
+                        break;
+                    }
+                    
+                    case '.unmuteuser': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                        if (mentionedJids.length === 0) {
+                            await sock.sendMessage(from, { text: '❌ Please mention a user to unmute. Usage: `.unmuteuser @user`' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        for (const userJid of mentionedJids) {
+                            if (isUserMuted(from, userJid)) {
+                                unmuteUser(from, userJid);
+                                await sock.sendMessage(from, { 
+                                    text: `🔊 @${userJid.split('@')[0]} has been unmuted and can send messages again.`,
+                                    mentions: [userJid]
+                                }, { quoted: msg });
+                            } else {
+                                await sock.sendMessage(from, { 
+                                    text: `ℹ️ @${userJid.split('@')[0]} is not currently muted.`,
+                                    mentions: [userJid]
+                                }, { quoted: msg });
+                            }
+                        }
+                        break;
+                    }
+                    
+                    case '.mutedusers': {
+                        if (!isGroup) {
+                            await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
+                            break;
+                        }
+                        if (!isAdmin) {
+                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
+                            break;
+                        }
+                        
+                        const mutedList = getMutedUsersList(from);
+                        
+                        if (mutedList.length === 0) {
+                            await sock.sendMessage(from, { text: 'ℹ️ No users are currently muted in this group.' }, { quoted: msg });
+                        } else {
+                            let response = '🔇 *Muted Users:*\n\n';
+                            const mentions = [];
+                            
+                            for (const mute of mutedList) {
+                                const username = mute.userJid.split('@')[0];
+                                response += `• @${username} - ${mute.remaining} left`;
+                                if (mute.reason) response += ` (${mute.reason})`;
+                                response += '\n';
+                                mentions.push(mute.userJid);
+                            }
+                            
+                            await sock.sendMessage(from, { 
+                                text: response,
+                                mentions: mentions
+                            }, { quoted: msg });
                         }
                         break;
                     }
