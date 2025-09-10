@@ -19,7 +19,7 @@ const QRCode = require('qrcode');
 const config = {
     autoRead: false,
     antiCall: true,
-    adminJids: ['94788006269@s.whatsapp.net', '11837550653588@lid'], // Support both regular and linked device formats
+    adminJids: ['94788006269@s.whatsapp.net','94767219661@s.whatsapp.net', '11837550653588@lid'], // Support both regular and linked device formats
     botEnabled: true
 };
 
@@ -968,7 +968,7 @@ async function startBot() {
                 
                 // If bot is OFF, only allow .on command
                 if (!config.botEnabled && command !== '.on') {
-                    await sock.sendMessage(from, { text: '🛑 The bot is currently OFF. Send `.on` to enable it.' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '🛑 The bot is currently OFF. Only bot admins can send `.on` to enable it.' }, { quoted: msg });
                     continue;
                 }
                 
@@ -980,16 +980,28 @@ async function startBot() {
                         break;
                     }
                     case '.on': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.on');
+                            break;
+                        }
                         config.botEnabled = true;
                         await sock.sendMessage(from, { text: '🚀 *Bot Status Updated*\n\n✅ Bot is now **ONLINE** and ready to serve!\n\n💡 *Tip:* Send `.panel` to explore all features.' }, { quoted: msg });
                         break;
                     }
                     case '.off': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.off');
+                            break;
+                        }
                         config.botEnabled = false;
-                        await sock.sendMessage(from, { text: '⏸️ *Bot Status Updated*\n\n� Bot is now **OFFLINE** for maintenance.\n\n🔧 Only the `.on` command will work until reactivation.' }, { quoted: msg });
+                        await sock.sendMessage(from, { text: '⏸️ *Bot Status Updated*\n\n🛑 Bot is now **OFFLINE** for maintenance.\n\n🔧 Only bot admins can use `.on` to reactivate.' }, { quoted: msg });
                         break;
                     }
                     case '.panel': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.panel');
+                            break;
+                        }
                         const panelText = `
 🤖  *WhatsApp Bot — Control Panel*
 ────────────────────────────────
@@ -1000,12 +1012,14 @@ async function startBot() {
 • \`.ping\` — Response time test
 • \`.about\` — Bot information
 
-�📌  *General Commands*
+�📌  *General Commands* (Bot Admin Only)
 • \`.panel\` — Show this menu
-• \`.status\` — Debug information
 • \`.autoread\` — Toggle auto view status (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
 • \`.on\` / \`.off\` — Turn bot on/off
+
+🔍  *Information Commands*
+• \`.status\` — Debug information
 
 🎨  *Media Commands*
 • \`.sticker\` — Convert image to sticker
@@ -1093,6 +1107,10 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         break;
                     }
                     case '.autoread': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.autoread');
+                            break;
+                        }
                         config.autoRead = !config.autoRead;
                         const status = config.autoRead ? '🟢 *ENABLED*' : '🔴 *DISABLED*';
                         const icon = config.autoRead ? '👀' : '🙈';
@@ -1103,6 +1121,10 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         break;
                     }
                     case '.anticall': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.anticall');
+                            break;
+                        }
                         config.antiCall = !config.antiCall;
                         const status = config.antiCall ? '🟢 *ENABLED*' : '🔴 *DISABLED*';
                         const icon = config.antiCall ? '📵' : '📞';

@@ -17,8 +17,8 @@
 
 ## ✨ Key Features
 
-### 🎛️ **Bot Management**
-- 🔧 **Control Panel** — Comprehensive command dashboard
+### 🎛️ **Bot Management** *(Bot Admin Only)*
+- 🔧 **Control Panel** — Comprehensive command dashboard  
 - 📖 **Auto-Read** — Toggle automatic message reading
 - 📞 **Anti-Call** — Block unwanted voice/video calls
 - ⚡ **Toggle Bot** — Enable/disable bot functionality instantly
@@ -143,13 +143,18 @@
 
 ## 📚 Command Reference
 
-### 🎛️ **General Commands**
+### 🎛️ **General Commands** *(Bot Admin Only)*
 | Command | Description | Usage |
 |---------|-------------|-------|
 | `.panel` | 📋 Show control panel | `.panel` |
 | `.autoread` | 📖 Toggle auto-read | `.autoread` |
 | `.anticall` | 📞 Toggle call blocking | `.anticall` |
 | `.on` / `.off` | ⚡ Enable/disable bot | `.on` or `.off` |
+
+### 🔍 **Information Commands**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.status` | 🔍 View debug status | `.status` |
 
 ### 🎨 **Media Commands**
 | Command | Description | Usage |
