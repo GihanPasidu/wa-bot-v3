@@ -726,21 +726,24 @@ function getColorInfo(colorName) {
 }
 
 function getCurrentDateTime() {
+    // Sri Lanka timezone (GMT+5:30)
+    const sriLankaOffset = 5.5 * 60; // 5 hours 30 minutes in minutes
     const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const sriLankaTime = new Date(utc + (sriLankaOffset * 60000));
     
-    // Get timezone offset
-    const timezoneOffset = now.getTimezoneOffset();
-    const timezone = `UTC${timezoneOffset > 0 ? '-' : '+'}${Math.abs(Math.floor(timezoneOffset / 60)).toString().padStart(2, '0')}:${Math.abs(timezoneOffset % 60).toString().padStart(2, '0')}`;
+    // Sri Lanka timezone info
+    const timezone = 'GMT+5:30 (Sri Lanka Standard Time)';
     
-    // Format date and time
-    const date = now.toLocaleDateString('en-US', {
+    // Format date and time for Sri Lanka
+    const date = sriLankaTime.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     });
     
-    const time = now.toLocaleTimeString('en-US', {
+    const time = sriLankaTime.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -748,8 +751,8 @@ function getCurrentDateTime() {
     });
     
     // Additional info
-    const unixTimestamp = Math.floor(now.getTime() / 1000);
-    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+    const unixTimestamp = Math.floor(sriLankaTime.getTime() / 1000);
+    const dayOfYear = Math.floor((sriLankaTime - new Date(sriLankaTime.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const weekNumber = Math.ceil(dayOfYear / 7);
     
     return {
@@ -759,8 +762,19 @@ function getCurrentDateTime() {
         unixTimestamp,
         dayOfYear,
         weekNumber,
-        iso: now.toISOString()
+        iso: sriLankaTime.toISOString(),
+        location: 'Sri Lanka',
+        localeDateString: sriLankaTime.toLocaleDateString(),
+        localeString: sriLankaTime.toLocaleString()
     };
+}
+
+// Helper function to get Sri Lanka time as Date object
+function getSriLankaTime() {
+    const sriLankaOffset = 5.5 * 60; // 5 hours 30 minutes in minutes
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    return new Date(utc + (sriLankaOffset * 60000));
 }
 
 async function startBot() {
@@ -989,7 +1003,7 @@ async function startBot() {
 �📌  *General Commands*
 • \`.panel\` — Show this menu
 • \`.status\` — Debug information
-• \`.autoread\` — Toggle auto read receipts (${config.autoRead ? '✅ ON' : '❌ OFF'})
+• \`.autoread\` — Toggle auto view status (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
 • \`.on\` / \`.off\` — Turn bot on/off
 
@@ -1021,7 +1035,7 @@ async function startBot() {
 
 📊  *Status*
 • Bot: ${config.botEnabled ? '✅ ON' : '🛑 OFF'}
-• Auto Read: ${config.autoRead ? '✅ Enabled' : '❌ Disabled'}
+• Auto view status: ${config.autoRead ? '✅ Enabled' : '❌ Disabled'}
 • Anti Call: ${config.antiCall ? '✅ Enabled' : '❌ Disabled'}
 
 ℹ️  *Tips*
@@ -1257,7 +1271,7 @@ ${shortUrl.includes('tinyurl.com') ? '🌐 *Powered by TinyURL*' : '⚠️ *Fall
                             const uptimeMinutes = Math.floor(uptimeSeconds / 60);
                             const uptimeHours = Math.floor(uptimeMinutes / 60);
                             
-                            const response = `🕐 *Global Time Service*
+                            const response = `🕐 *Sri Lanka Time Service*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 *Current Date:*
@@ -1269,6 +1283,9 @@ ${timeInfo.time}
 🌍 *Timezone:*
 ${timeInfo.timezone}
 
+🏝️ *Location:*
+${timeInfo.location}
+
 📊 *Detailed Information:*
 • 📆 Day of Year: ${timeInfo.dayOfYear}
 • 🗓️ Week Number: ${timeInfo.weekNumber}
@@ -1279,7 +1296,7 @@ ${timeInfo.timezone}
 • ⏱️ Uptime: ${uptimeHours}h ${uptimeMinutes % 60}m ${uptimeSeconds % 60}s
 • 🟢 Status: Active & Responsive
 
-🌐 *Accurate worldwide time data*`;
+�🇰 *Sri Lanka Standard Time (SLST)*`;
                             
                             await sock.sendMessage(from, { text: response }, { quoted: msg });
                         } catch (e) {
@@ -1355,7 +1372,7 @@ ${timeInfo.timezone}
 
 ⚙️ **Bot Control**
 • \`.on\` / \`.off\` — Enable/disable bot
-• \`.autoread\` — Toggle read receipts
+• \`.autoread\` — Toggle auto view status
 • \`.anticall\` — Toggle call blocking
 
 🎨 **Media Commands**
@@ -1423,9 +1440,9 @@ ${timeInfo.timezone}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⏱️ **Uptime Information:**
-• 🚀 Started: ${new Date(startTime).toLocaleString()}
+• 🚀 Started: ${getSriLankaTime().toLocaleString()} (SLST)
 • ⏰ Running: ${uptimeString.trim()}
-• 📅 Current: ${new Date().toLocaleString()}
+• 📅 Current: ${getSriLankaTime().toLocaleString()} (SLST)
 
 💻 **System Performance:**
 • 🧠 Memory Usage: ${memoryMB} MB
@@ -1435,7 +1452,7 @@ ${timeInfo.timezone}
 🤖 **Bot Status:**
 • 🟢 Status: Active & Responsive
 • 📡 Connection: Stable
-• 🛡️ Auto Read: ${config.autoRead ? 'Enabled' : 'Disabled'}
+• 🛡️ Auto view status: ${config.autoRead ? 'Enabled' : 'Disabled'}
 • 📵 Anti Call: ${config.antiCall ? 'Enabled' : 'Disabled'}
 
 📈 **Feature Statistics:**
@@ -2288,7 +2305,7 @@ Try \`.ghelp\` for group commands.`;
 📊 **Total Members:** ${participants.length}
 👑 **Admins:** ${admins.length}
 👤 **Regular Members:** ${members.length}
-📅 **Group Created:** ${new Date(groupMetadata.creation * 1000).toLocaleDateString()}
+📅 **Group Created:** ${new Date(groupMetadata.creation * 1000).toLocaleDateString('en-US', { timeZone: 'Asia/Colombo' })} (SLST)
 
 📋 **Group Name:** ${groupMetadata.subject}`;
                             
@@ -2387,7 +2404,7 @@ Try \`.ghelp\` for group commands.`;
 📋 **Group Info:**
 • Name: ${groupMetadata.subject}
 • ID: ${from}
-• Created: ${new Date(groupMetadata.creation * 1000).toLocaleDateString()}
+• Created: ${new Date(groupMetadata.creation * 1000).toLocaleDateString('en-US', { timeZone: 'Asia/Colombo' })} (SLST)
 • Description: ${groupMetadata.desc ? 'Set' : 'Not set'}
 
 👥 **Membership:**

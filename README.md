@@ -1,228 +1,383 @@
-# WhatsApp Bot v3### 🔧 Advanced Tools
-- `.shorturl [url]` — URL shortener powered by TinyURL
-- `.color [name]` — Comprehensive color code lookup (HEX, RGB, HSL)
-- `.time` — Current date, time, timezone, and bot uptime
-- `.pass [length]` — Cryptographically secure password generator feature-rich WhatsApp bot built with Baileys library, offering comprehensive group management, media processing, and advanced utility tools.
+# 🤖 CloudNextra Bot v3.0.0
 
-## Features
+<div align="center">
 
-### � General Commands
-- `.panel` — Control panel with all available commands
-- `.autoread` — Toggle automatic read receipts
-- `.anticall` — Toggle call blocking
-- `.on` / `.off` — Enable/disable bot functionality
+![CloudNextra Bot](https://img.shields.io/badge/CloudNextra-Bot%20v3.0.0-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Baileys](https://img.shields.io/badge/Baileys-6.6.0-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-### 🎨 Media Commands
-- `.sticker` — Convert images to WhatsApp stickers
-- `.toimg` — Convert stickers back to images
-- Supports quoted messages and direct media
+**🚀 Advanced WhatsApp Bot with Enterprise-Grade Features**
 
-### � Advanced Tools
-- `.shorturl [url]` — URL shortener with demo functionality
-- `.color [name]` — Comprehensive color code lookup (HEX, RGB, HSL)
-- `.time` — Current date, time, timezone, and bot uptime
-- `.pass [length]` — Cryptographically secure password generator
+*Built using the powerful Baileys library*
 
-### � Group Management (Admin Only)
-- `.ginfo` — Detailed group information
-- `.tagall [message]` — Tag all group members
-- `.admins` — List group administrators
-- `.members` — Member statistics and analytics
-- `.rules` — Display group rules
-- `.kick @user` — Remove members from group
-- `.promote @user` — Promote members to admin
-- `.mute [duration]` — Temporarily mute the group
-- `.warn @user` — Issue warnings to members
-- `.resetwarns` — Clear all member warnings
-- `.groupstats` — Comprehensive group statistics
-- `.lock` / `.unlock` — Control group settings
-- `.antilink on/off` — Automatic link removal protection
+</div>
 
-### 🔐 Security Features
-- Admin-only commands with permission validation
-- Automatic call rejection
-- Anti-link protection for groups
-- Secure auth data handling (not stored in git)
+---
 
-## Prerequisites
+## ✨ Key Features
 
-- **Node.js 20+** (required for Baileys library)
-- **npm 9+**
-- WhatsApp account for authentication
+### 🎛️ **Bot Management**
+- 🔧 **Control Panel** — Comprehensive command dashboard
+- 📖 **Auto-Read** — Toggle automatic message reading
+- 📞 **Anti-Call** — Block unwanted voice/video calls
+- ⚡ **Toggle Bot** — Enable/disable bot functionality instantly
 
-## Setup
+### 🎨 **Media Processing**
+- 🏷️ **Sticker Creator** — Convert images to WhatsApp stickers
+- 🖼️ **Image Converter** — Transform stickers back to images
+- 📱 **Quote Support** — Works with quoted messages and direct media
+- 🎭 **High Quality** — Professional media processing with Sharp
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd wa-bot-v3
-```
+### 🛠️ **Advanced Utilities**
+- 🔗 **URL Shortener** — Powered by TinyURL API integration
+- 🌈 **Color Lookup** — Complete color codes (HEX, RGB, HSL)
+- ⏰ **Time & Uptime** — Current time, timezone, and bot statistics
+- 🔐 **Password Generator** — Cryptographically secure passwords
 
-2. Install dependencies:
-```bash
-npm install
-```
+### 👥 **Group Management** *(Admin Only)*
+- ℹ️ **Group Info** — Detailed group analytics and information
+- 📢 **Tag All** — Mention all group members with custom message
+- 👑 **Admin Tools** — List administrators and manage permissions
+- 📊 **Member Stats** — Comprehensive member analytics
+- 📜 **Group Rules** — Display and manage group guidelines
+- 🚫 **Member Control** — Kick, promote, and manage members
+- 🔇 **Advanced Muting** — Group and individual user mute system
+- ⚠️ **Warning System** — Issue and track member warnings
+- 📈 **Group Statistics** — Detailed group activity metrics
+- 🔒 **Group Lock** — Control group settings and permissions
+- 🚫 **Anti-Link** — Automatic link removal protection
 
-3. Configure admin number in `bot.js`:
-```javascript
-adminJids: ['your-number@s.whatsapp.net']
-```
+### 🛡️ **Security & Moderation**
+- 🔐 **Admin Validation** — Secure permission checking system
+- 📞 **Call Rejection** — Automatic call blocking functionality
+- 🔗 **Link Protection** — Advanced anti-link system for groups
+- 💾 **Secure Auth** — Authentication data protection (excluded from git)
+- 🔄 **Persistent Login** — Auth data survives deployments
 
-4. Run the bot:
-```bash
-node bot.js
-```
+---
 
-5. Authenticate with WhatsApp:
-   - **Web Interface**: Open `http://localhost:10000` in your browser
-   - **Terminal**: Scan the QR code displayed in the console
+## 🚀 Quick Start
 
-## Dependencies
+### 📋 **Prerequisites**
+- 🟢 **Node.js 20+** *(Required for Baileys compatibility)*
+- 📦 **npm 9+** *(Package manager)*
+- 📱 **WhatsApp Account** *(For authentication)*
 
-- `@whiskeysockets/baileys` - WhatsApp Web API
-- `axios` - HTTP client for TinyURL API
-- `sharp` - Image processing for stickers
-- `pino` - Logging framework
-- `qrcode-terminal` - QR code display
-- `crypto` - Password generation
+### ⚡ **Installation**
 
-## Deployment on Render
-
-### Prerequisites
-- GitHub repository with your bot code
-- Render account (free tier available)
-
-### Step-by-Step Deployment
-
-1. **Prepare Your Repository**
+1. **📥 Clone Repository**
    ```bash
-   git add .
-   git commit -m "Prepare for Render deployment"
-   git push origin main
+   git clone https://github.com/GihanPasidu/wa-bot-v3.git
+   cd wa-bot-v3
    ```
 
-2. **Deploy to Render**
+2. **📦 Install Dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **⚙️ Configure Admin**
+   
+   Edit `bot.js` and add your WhatsApp number:
+   ```javascript
+   adminJids: ['your-number@s.whatsapp.net']
+   ```
+
+4. **🚀 Start Bot**
+   ```bash
+   npm start
+   ```
+
+5. **📱 Authenticate**
+   - **🌐 Web Interface**: Visit `http://localhost:10000`
+   - **💻 Terminal**: Scan QR code in console
+
+---
+
+## 🌐 Cloud Deployment
+
+### 🚀 **Deploy to Render** *(Recommended)*
+
+<div align="center">
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com)
+
+</div>
+
+#### **📋 Deployment Steps:**
+
+1. **🔗 Connect Repository**
    - Go to [Render Dashboard](https://dashboard.render.com/)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub repository
    - Select your `wa-bot-v3` repository
 
-3. **Configure Deployment Settings**
-   - **Name**: `whatsapp-bot-v3`
-   - **Environment**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Instance Type**: `Free` (or paid for better performance)
-
-4. **Set Environment Variables**
-   In Render dashboard, add these environment variables:
+2. **⚙️ Configure Service**
+   ```yaml
+   Name: cloudnextra-bot
+   Environment: Node
+   Build Command: npm install
+   Start Command: npm start
+   Instance Type: Free (or paid for better performance)
    ```
+
+3. **🌍 Environment Variables**
+   ```bash
    NODE_ENV=production
    PORT=10000
+   RENDER_EXTERNAL_URL=https://your-app-name.onrender.com
    ADMIN_JIDS=your-number@s.whatsapp.net
-   AUTO_READ=false
-   ANTI_CALL=true
-   BOT_ENABLED=true
    ```
 
-5. **Deploy and Monitor**
+4. **🎉 Deploy & Authenticate**
    - Click "Create Web Service"
-   - Monitor the build logs
-   - Wait for deployment to complete
-   - Your bot will be available at `https://your-app-name.onrender.com`
+   - Visit your deployed URL for QR authentication
+   - Bot automatically handles persistence across updates!
 
-### First-Time Setup After Deployment
+### 🔒 **Authentication Persistence**
+- ✅ **Zero Downtime** — Auth data survives all deployments
+- ✅ **No Re-scanning** — QR codes only needed once per week
+- ✅ **Auto-Backup** — Intelligent auth data management
+- ✅ **Security Compliant** — 7-day rotation policy
 
-1. **Access QR Code Interface**
-   - Visit your deployed URL: `https://your-app-name.onrender.com`
-   - Professional QR code authentication page will load
-   - Page auto-refreshes every 10 seconds
+---
 
-2. **Scan QR Code**
-   - QR codes appear automatically on the webpage
-   - Open WhatsApp → Settings → Linked Devices → Link a Device
-   - Scan the QR code from the webpage
-   - Page will show "Connected Successfully!" when done
+## 📚 Command Reference
 
-3. **Test Bot Commands**
-   - Send `.ping` to test connectivity
-   - Use `.help` to see all available commands
-   - Verify all features work correctly
+### 🎛️ **General Commands**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.panel` | 📋 Show control panel | `.panel` |
+| `.autoread` | 📖 Toggle auto-read | `.autoread` |
+| `.anticall` | 📞 Toggle call blocking | `.anticall` |
+| `.on` / `.off` | ⚡ Enable/disable bot | `.on` or `.off` |
 
-### Production Considerations
+### 🎨 **Media Commands**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.sticker` | 🏷️ Create sticker | `.sticker` (with image) |
+| `.toimg` | 🖼️ Convert to image | `.toimg` (reply to sticker) |
 
-- **Persistent Storage**: Auth data will persist across deployments
-- **Health Checks**: Automatic health monitoring at `/health`
-- **QR Code Interface**: User-friendly QR authentication at `/` or `/qr`
-- **QR Data API**: JSON QR code data available at `/qr-data`
-- **Keep-Alive**: Self-ping every 5 minutes to prevent service sleeping
-- **Auto-Deploy**: Automatically deploys on GitHub pushes
-- **Scaling**: Upgrade to paid plans for better performance
-- **Monitoring**: Use Render logs and metrics for monitoring
+### 🛠️ **Utility Commands**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.shorturl` | 🔗 Shorten URL | `.shorturl https://example.com` |
+| `.color` | 🌈 Color lookup | `.color red` |
+| `.time` | ⏰ Current time | `.time` |
+| `.pass` | 🔐 Generate password | `.pass 16` |
 
-### Troubleshooting
+### 👥 **Group Commands** *(Admin Only)*
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.ginfo` | ℹ️ Group information | `.ginfo` |
+| `.tagall` | 📢 Tag all members | `.tagall Meeting now!` |
+| `.admins` | 👑 List admins | `.admins` |
+| `.kick` | 🚫 Remove member | `.kick @user` |
+| `.promote` | ⬆️ Promote to admin | `.promote @user` |
+| `.mute` | 🔇 Mute group | `.mute 1h` |
+| `.muteuser` | 🔇 Mute individual | `.muteuser @user 30m spam` |
+| `.warn` | ⚠️ Warn member | `.warn @user` |
+| `.antilink` | 🔗 Toggle link protection | `.antilink on` |
 
-- **Build Failures**: Check Node.js version compatibility
-- **Memory Issues**: Consider upgrading to paid tier
-- **Connection Issues**: Verify WhatsApp authentication
-- **Command Errors**: Check admin JID configuration
+---
 
-## File Structure
+## 🔧 Technical Stack
+
+### **🏗️ Core Technologies**
+- **[@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys)** — WhatsApp Web API
+- **[axios](https://axios-http.com/)** — HTTP client for API requests
+- **[sharp](https://sharp.pixelplumbing.com/)** — High-performance image processing
+- **[pino](https://getpino.io/)** — Lightning-fast logging framework
+- **[qrcode](https://www.npmjs.com/package/qrcode)** — QR code generation
+
+### **🌟 Key Features**
+- 🔄 **Auto-Recovery** — Automatic reconnection handling
+- 💾 **Persistent Auth** — Authentication survives deployments
+- 🛡️ **Security First** — Admin validation and secure auth handling
+- 📱 **Mobile Responsive** — Web QR interface works on all devices
+- ⚡ **High Performance** — Optimized for production environments
+
+---
+
+## 🌍 Production Features
+
+### **🔍 Monitoring & Health**
+- 🩺 **Health Checks** — `/health` endpoint for monitoring
+- 📊 **Status Dashboard** — Real-time bot status at web interface
+- 🔄 **Auto-Recovery** — Automatic reconnection on disconnection
+- 💓 **Keep-Alive** — Prevents service sleeping on free tiers
+
+#### **⏰ External Health Monitoring with Cron-Job.org**
+
+For enhanced reliability and automated monitoring, set up external health checks using **[cron-job.org](https://cron-job.org)**:
+
+**🚀 Quick Setup Steps:**
+
+1. **📝 Create Account**
+   - Visit [cron-job.org](https://cron-job.org)
+   - Sign up for a free account
+
+2. **➕ Add New Cron Job**
+   ```
+   Title: CloudNextra Bot Health Check
+   URL: https://your-app-name.onrender.com/health
+   Schedule: */5 * * * * (Every 5 minutes)
+   Request Method: GET
+   Expected HTTP Status: 200
+   ```
+
+3. **🔔 Configure Notifications**
+   ```
+   Email Notifications: ✅ Enable
+   Failure Notifications: ✅ Send on failure
+   Success Notifications: ❌ Disable (optional)
+   Notification Email: your-email@domain.com
+   ```
+
+4. **⚙️ Advanced Settings**
+   ```
+   Timeout: 30 seconds
+   Retries: 3 attempts
+   User-Agent: CloudNextra-HealthMonitor/1.0
+   Follow Redirects: ✅ Yes
+   ```
+
+**📊 Expected Health Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "uptime": "2d 4h 30m",
+  "whatsapp_status": "connected",
+  "version": "3.0.0"
+}
+```
+
+**🎯 Benefits:**
+- ✅ **24/7 Monitoring** — Continuous health surveillance
+- ✅ **Instant Alerts** — Email notifications on failures
+- ✅ **Keep Services Active** — Prevents Render free tier sleeping
+- ✅ **Performance Tracking** — Monitor response times and uptime
+- ✅ **Zero Cost** — Free monitoring service
+- ✅ **Global Monitoring** — Multiple server locations
+
+**🔧 Alternative Monitoring Services:**
+- **[UptimeRobot](https://uptimerobot.com/)** — 50 monitors free
+- **[StatusCake](https://www.statuscake.com/)** — Free tier available
+- **[Pingdom](https://www.pingdom.com/)** — Basic monitoring
+- **[Better Uptime](https://betteruptime.com/)** — Modern interface
+
+### **🔐 Security & Reliability**
+- 🛡️ **Admin Only Commands** — Secure permission validation
+- 🔒 **Auth Protection** — Sensitive data excluded from repository
+- 🔄 **Backup System** — Automatic auth data backup and restore
+- ⏰ **Session Management** — Intelligent session handling
+
+### **📈 Scalability**
+- 🚀 **Production Ready** — Optimized for cloud deployment
+- 📦 **Docker Support** — Containerized deployment option
+- 🔧 **Environment Config** — Flexible configuration management
+- 📊 **Performance Optimized** — Efficient resource utilization
+
+---
+
+## 📁 Project Structure
 
 ```
 wa-bot-v3/
-├── bot.js              # Main bot implementation
-├── package.json        # Dependencies and scripts
-├── README.md          # Documentation
-├── .gitignore         # Git ignore rules
-└── auth/              # WhatsApp session data (auto-generated)
+├── 📄 bot.js                    # Main bot implementation
+├── 📦 package.json              # Dependencies and scripts
+├── 📚 README.md                 # This documentation
+├── 🔐 PERSISTENT-AUTH.md        # Authentication persistence guide
+├── 👥 USER-MUTE-FEATURE.md     # Individual user mute system
+├── ⚙️  .env.example             # Environment variables template
+├── 🐳 Dockerfile               # Docker containerization
+├── 🚀 render.yaml              # Render deployment config
+├── 🌐 public/
+│   └── qr.html                 # Professional QR interface
+└── 🔒 auth/                    # WhatsApp session data (auto-generated)
     ├── creds.json
-    └── *.json         # Session files
+    └── *.json                  # Session files
 ```
 
-## Usage Examples
+---
 
-### Media Commands
-```
+## 💡 Usage Examples
+
+### **🎨 Media Commands**
+```bash
 # Convert image to sticker
 Send image with caption: .sticker
 # or reply to image: .sticker
 
 # Convert sticker to image  
-Send sticker with caption: .toimg
-# or reply to sticker: .toimg
+Reply to sticker: .toimg
 ```
 
-### Advanced Tools
-```
+### **🛠️ Advanced Tools**
+```bash
 .shorturl https://example.com/very/long/url/path
 .color red
 .time
 .pass 16
 ```
 
-### Group Management
-```
+### **👥 Group Management**
+```bash
 .ginfo
-.tagall Hello everyone!
-.kick @username
-.promote @username
-.warn @username spamming
+.tagall 📢 Important announcement!
+.kick @spammer
+.promote @trusted_user
+.warn @rule_breaker Please follow group rules
 .mute 1h
+.muteuser @troublemaker 30m spamming
 .antilink on
 ```
 
-## Admin Configuration
+---
 
-The bot recognizes admins by their JID (WhatsApp ID) configured in the `adminJids` array. Admin commands are restricted to these users only.
+## 🤝 Contributing
 
-## Notes
+We welcome contributions! Here's how you can help:
 
-- Group management commands only work in WhatsApp groups
-- Admin commands require both bot admin status and user admin status
-- Media commands support various WhatsApp message types
-- All sensitive authentication data is excluded from git tracking
+1. **🍴 Fork** the repository
+2. **🌿 Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **💾 Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **📤 Push** to branch (`git push origin feature/amazing-feature`)
+5. **🔃 Open** a Pull Request
 
-## License
+---
 
-This project is for educational purposes. Please comply with WhatsApp's Terms of Service when using automated tools.
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🆘 Support
+
+### **📞 Get Help**
+- 🐛 **Issues**: [GitHub Issues](https://github.com/GihanPasidu/wa-bot-v3/issues)
+- 📖 **Documentation**: Check our comprehensive guides
+- 💬 **Community**: Join our discussions
+
+### **🔗 Quick Links**
+- 🌐 **Live Demo**: [CloudNextra Bot Demo](https://wa-bot-v3.onrender.com)
+
+### **🔧 Troubleshooting**
+- **Build Failures**: Check Node.js version compatibility (requires 20+)
+- **Memory Issues**: Consider upgrading to Render paid tier
+- **Connection Issues**: Verify WhatsApp authentication and QR scanning
+- **Command Errors**: Check admin JID configuration in bot.js
+
+---
+
+<div align="center">
+
+**⭐ Star this repository if you found it helpful!**
+
+Made by [CloudNextra Solutions](https://github.com/GihanPasidu)
+
+![GitHub stars](https://img.shields.io/github/stars/GihanPasidu/wa-bot-v3?style=social)
+![GitHub forks](https://img.shields.io/github/forks/GihanPasidu/wa-bot-v3?style=social)
+
+</div>
