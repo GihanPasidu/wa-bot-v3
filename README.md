@@ -17,6 +17,12 @@
 
 ## ✨ Key Features
 
+### 🎛️ **Smart Role-Based Interface**
+- 👑 **Admin Panel** — Comprehensive control dashboard for bot administrators
+- 👤 **User Menu** — Simplified interface for regular users
+- 🔧 **Context-Aware Messages** — Different help and error messages based on user role
+- 📊 **Role-Specific Information** — Debug details for admins, user-friendly guidance for others
+
 ### 🎛️ **Bot Management** *(Bot Admin Only)*
 - 🔧 **Control Panel** — Comprehensive command dashboard  
 - 📖 **Auto-Read** — Toggle automatic message reading
@@ -49,7 +55,8 @@
 - 🚫 **Anti-Link** — Automatic link removal protection
 
 ### 🛡️ **Security & Moderation**
-- 🔐 **Admin Validation** — Secure permission checking system
+- 🔐 **Role-Based Access** — Smart permission system with separate interfaces for admins and users
+- 📊 **Context-Aware Messaging** — Error messages and help content tailored to user privileges
 - 📞 **Call Rejection** — Automatic call blocking functionality
 - 🔗 **Link Protection** — Advanced anti-link system for groups
 - 💾 **Secure Auth** — Authentication data protection (excluded from git)
@@ -143,18 +150,20 @@
 
 ## 📚 Command Reference
 
-### 🎛️ **General Commands** *(Bot Admin Only)*
+### 🎛️ **Bot Management** *(Bot Admin Only)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.panel` | 📋 Show control panel | `.panel` |
+| `.panel` | 📋 Show admin control panel | `.panel` |
 | `.autoread` | 📖 Toggle auto-read | `.autoread` |
 | `.anticall` | 📞 Toggle call blocking | `.anticall` |
 | `.on` / `.off` | ⚡ Enable/disable bot | `.on` or `.off` |
 
-### 🔍 **Information Commands**
+### 🔍 **Information Commands** *(Available to All)*
 | Command | Description | Usage |
 |---------|-------------|-------|
 | `.status` | 🔍 View debug status | `.status` |
+| `.help` | 📚 Role-based help guide | `.help` |
+| `.panel` | 📋 User menu (for non-admins) | `.panel` |
 
 ### 🎨 **Media Commands**
 | Command | Description | Usage |

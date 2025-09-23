@@ -530,35 +530,72 @@ function getSelfChatTargetJid(senderJid, fromJid) {
 // Helper function to send error messages to users
 async function sendErrorMessage(sock, senderJid, fromJid, errorType, commandName = '') {
     const targetJid = getSelfChatTargetJid(senderJid, fromJid);
+    const isUserAdmin = config.adminJids.includes(senderJid);
     
     let errorMessage = '';
     switch (errorType) {
         case 'STICKER_FAILED':
-            errorMessage = `❌ *Sticker Creation Failed*\n\n🔧 *Possible Issues:*\n• Image format not supported\n• File size too large\n• Network connection issue\n\n💡 *Try:* Send a JPEG/PNG image`;
+            if (isUserAdmin) {
+                errorMessage = `❌ *Sticker Creation Failed*\n\n🔧 *Admin Debug Info:*\n• Image format: Check if JPEG/PNG/WEBP\n• File size: Max 10MB recommended\n• Processing: Sharp library error\n• Network: API connectivity issue\n\n💡 *Admin Actions:* Check server logs, verify Sharp installation`;
+            } else {
+                errorMessage = `❌ *Sticker Creation Failed*\n\n🔧 *What to try:*\n• Send a clear JPEG or PNG image\n• Make sure image isn't too large\n• Try again in a moment\n\n💡 *Tip:* JPG and PNG work best!`;
+            }
             break;
         case 'TOIMG_FAILED':
-            errorMessage = `❌ *Image Conversion Failed*\n\n🔧 *Possible Issues:*\n• Sticker format not supported\n• File corrupted\n• Processing error\n\n💡 *Try:* Send a different sticker`;
+            if (isUserAdmin) {
+                errorMessage = `❌ *Image Conversion Failed*\n\n🔧 *Admin Debug Info:*\n• Sticker format: WebP/AVIF conversion issue\n• Buffer processing: Sharp conversion error\n• Memory: Possible memory limitation\n\n💡 *Admin Actions:* Check memory usage, verify file integrity`;
+            } else {
+                errorMessage = `❌ *Image Conversion Failed*\n\n� *What to try:*\n• Reply to a different sticker\n• Make sure it's an animated sticker\n• Try again in a moment\n\n💡 *Tip:* Some stickers work better than others!`;
+            }
             break;
         case 'MEDIA_DOWNLOAD_FAILED':
-            errorMessage = `❌ *Media Download Failed*\n\n🔧 *Issue:* Unable to download media file\n\n💡 *Try:* Send the media again or check your connection`;
+            if (isUserAdmin) {
+                errorMessage = `❌ *Media Download Failed*\n\n🔧 *Admin Debug Info:*\n• Baileys API: Download stream error\n• Network: Connection timeout\n• File: Corrupted or unavailable\n• Server: WhatsApp media server issue\n\n💡 *Admin Actions:* Check network logs, verify Baileys version`;
+            } else {
+                errorMessage = `❌ *Media Download Failed*\n\n� *What to try:*\n• Send the media file again\n• Check your internet connection\n• Try a different file\n\n💡 *Tip:* Sometimes media files expire, try sending fresh ones!`;
+            }
             break;
         case 'GROUP_ADMIN_REQUIRED':
-            errorMessage = `🚫 *Access Denied*\n\n👑 *Required:* Group admin privileges\n\n💡 *Note:* Only group admins can use this command`;
+            if (isUserAdmin) {
+                errorMessage = `🚫 *Group Admin Required*\n\n👑 *Bot Admin Info:*\nYou have bot admin privileges, but this command requires group admin status in this specific chat.\n\n🔧 *Details:*\n• Command: ${commandName}\n• User: Bot Admin\n• Missing: Group Admin Role\n\n💡 *Solution:* Ask a group admin to promote you in this group`;
+            } else {
+                errorMessage = `🚫 *Access Denied*\n\n👑 *Required:* Group admin privileges\n\n💡 *Note:* Only group admins can use this command\n\n🤝 *Ask:* Group admins to help you with this request`;
+            }
             break;
         case 'BOT_ADMIN_REQUIRED':
-            errorMessage = `🚫 *Access Denied*\n\n🤖 *Required:* Bot admin privileges\n\n💡 *Note:* Only bot admins can use this command`;
+            if (isUserAdmin) {
+                errorMessage = `⚠️ *Verification Error*\n\n🤖 *Bot Admin Notice:*\nYou should have access to this command. This might be a bug.\n\n� *Debug Info:*\n• Your JID: ${senderJid}\n• Admin List: ${config.adminJids.join(', ')}\n• Command: ${commandName}\n\n💡 *Contact:* Developer for investigation`;
+            } else {
+                errorMessage = `�🚫 *Access Denied*\n\n🤖 *Required:* Bot administrator privileges\n\n💡 *Note:* This command is restricted to bot admins only\n\n🤝 *Contact:* A bot administrator if you need this feature`;
+            }
             break;
         case 'GROUP_ONLY':
-            errorMessage = `🚫 *Command Restriction*\n\n👥 *Usage:* This command only works in groups\n\n💡 *Try:* Use this command in a group chat`;
+            if (isUserAdmin) {
+                errorMessage = `🚫 *Group Command Only*\n\n👥 *Admin Info:*\nThis command is designed for group chats only.\n\n🔧 *Technical:*\n• Command: ${commandName}\n• Context: Private/Direct Message\n• Required: Group Chat Context\n\n💡 *Usage:* Use this command in a group where you're admin`;
+            } else {
+                errorMessage = `🚫 *Command Restriction*\n\n👥 *Usage:* This command only works in groups\n\n💡 *Try:* Use this command in a group chat where you're an admin`;
+            }
             break;
         case 'COMMAND_ERROR':
-            errorMessage = `❌ *Command Processing Error*\n\n🔧 *Command:* ${commandName}\n\n💡 *Try:* Check command syntax or try again later`;
+            if (isUserAdmin) {
+                errorMessage = `❌ *Command Processing Error*\n\n🔧 *Admin Debug Info:*\n• Command: ${commandName}\n• Error Type: Processing failure\n• Possible Causes: Syntax error, API failure, server issue\n• Timestamp: ${new Date().toISOString()}\n\n💡 *Admin Actions:* Check server logs, verify command syntax`;
+            } else {
+                errorMessage = `❌ *Command Error*\n\n🔧 *Command:* ${commandName}\n\n💡 *Try:* Check your command spelling and try again\n\n🤝 *Help:* Contact an admin if this keeps happening`;
+            }
             break;
         case 'NETWORK_ERROR':
-            errorMessage = `🌐 *Network Error*\n\n🔧 *Issue:* Connection problem\n\n💡 *Try:* Check your internet connection and try again`;
+            if (isUserAdmin) {
+                errorMessage = `🌐 *Network Error*\n\n🔧 *Admin Debug Info:*\n• Connection: API timeout or failure\n• Status: Network connectivity issue\n• Service: External API unreachable\n• Time: ${new Date().toLocaleString()}\n\n💡 *Admin Actions:* Check internet connection, verify API endpoints`;
+            } else {
+                errorMessage = `🌐 *Network Error*\n\n🔧 *Issue:* Connection problem\n\n💡 *Try:* Check your internet and try again in a moment\n\n⏰ *Usually fixes itself:* Network issues are often temporary`;
+            }
             break;
         default:
-            errorMessage = `❌ *Something went wrong*\n\n🔧 *Error:* An unexpected error occurred\n\n💡 *Try:* Please try again or contact support`;
+            if (isUserAdmin) {
+                errorMessage = `❌ *Unknown Error (Admin)*\n\n🔧 *Debug Info:*\n• Error Type: ${errorType}\n• Command: ${commandName}\n• User: Bot Admin\n• JID: ${senderJid}\n\n💡 *Admin Actions:* Check logs, report to developer if persistent`;
+            } else {
+                errorMessage = `❌ *Something went wrong*\n\n🔧 *Error:* An unexpected error occurred\n\n💡 *Try:* Please try again in a moment\n\n🤝 *Contact:* An admin if this problem continues`;
+            }
     }
     
     try {
@@ -998,40 +1035,39 @@ async function startBot() {
                         break;
                     }
                     case '.panel': {
-                        if (!isBotAdmin) {
-                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.panel');
-                            break;
-                        }
-                        const panelText = `
-🤖  *WhatsApp Bot — Control Panel*
-────────────────────────────────
+                        // Create different panel content based on user role
+                        const isAdmin = isBotAdmin;
+                        let panelText;
+                        
+                        if (isAdmin) {
+                            // Admin Panel - Full access
+                            panelText = `
+🤖  *WhatsApp Bot — Admin Control Panel*
+────────────────────────────────────────
 
-�  *Basic Commands*
-• \`.help\` — Complete commands list
-• \`.stats\` — Bot statistics & uptime  
-• \`.ping\` — Response time test
-• \`.about\` — Bot information
+👑  *Welcome, Administrator!*
+You have full access to all bot features and controls.
 
-�📌  *General Commands* (Bot Admin Only)
-• \`.panel\` — Show this menu
+📌  *Bot Management* (Admin Only)
+• \`.panel\` — Show this admin panel
 • \`.autoread\` — Toggle auto view status (${config.autoRead ? '✅ ON' : '❌ OFF'})
 • \`.anticall\` — Toggle call blocking (${config.antiCall ? '✅ ON' : '❌ OFF'})
-• \`.on\` / \`.off\` — Turn bot on/off
+• \`.on\` / \`.off\` — Enable/disable bot
 
 🔍  *Information Commands*
-• \`.status\` — Debug information
+• \`.status\` — Debug & system information
 
 🎨  *Media Commands*
 • \`.sticker\` — Convert image to sticker
 • \`.toimg\` — Convert sticker to image
 
-�  *Advanced Tools*
+🛠️  *Advanced Tools*
 • \`.shorturl [url]\` — URL shortener
-• \`.color [name]\` — Color code lookup
+• \`.color [name]\` — Color code lookup  
 • \`.time\` — Current time & date
 • \`.pass [12]\` — Password generator
 
-�👑  *Group Management* (Admin Only)
+�  *Group Management* (Group Admin Required)
 • \`.ginfo\` — Group information
 • \`.tagall [message]\` — Tag all members
 • \`.admins\` — List group admins
@@ -1047,27 +1083,65 @@ async function startBot() {
 • \`.lock\` / \`.unlock\` — Lock group
 • \`.antilink on/off\` — Link protection
 
-📊  *Status*
-• Bot: ${config.botEnabled ? '✅ ON' : '🛑 OFF'}
-• Auto view status: ${config.autoRead ? '✅ Enabled' : '❌ Disabled'}
+📊  *System Status*
+• Bot: ${config.botEnabled ? '✅ ONLINE' : '🛑 OFFLINE'}
+• Auto Read: ${config.autoRead ? '✅ Enabled' : '❌ Disabled'}
 • Anti Call: ${config.antiCall ? '✅ Enabled' : '❌ Disabled'}
 
-ℹ️  *Tips*
-• Send image + \`.sticker\` or reply \`.sticker\` to convert to sticker
-• Send sticker + \`.toimg\` or reply \`.toimg\` to convert to image
-• Group commands only work if you're an admin in the group
-• Use \`.ghelp\` in groups to see all group management commands
+⚡  *Admin Privileges Active*
 `;
-                    try {
-                        // Fix for self-chat: get correct target JID
-                        const targetJid = getSelfChatTargetJid(senderJid, from);
-                        if (targetJid !== from) {
-                            console.log(`🔄 Redirecting self-chat message from ${from} to ${targetJid}`);
+                        } else {
+                            // User Panel - Limited access
+                            panelText = `
+🤖  *WhatsApp Bot — User Menu*
+──────────────────────────────
+
+👋  *Welcome, User!*
+Here are the commands available to you:
+
+🔍  *Information Commands*
+• \`.status\` — Bot status & information
+
+🎨  *Media Commands*
+• \`.sticker\` — Convert image to sticker
+• \`.toimg\` — Convert sticker to image
+
+🛠️  *Utility Tools*
+• \`.shorturl [url]\` — Shorten long URLs
+• \`.color [name]\` — Get color codes (hex, rgb, hsl)
+• \`.time\` — Current time & date
+• \`.pass [12]\` — Generate secure password
+
+👥  *Group Features* (When you're group admin)
+• \`.ginfo\` — Group information
+• \`.tagall [message]\` — Mention all members
+• \`.admins\` — List group administrators
+• \`.members\` — Member count & statistics
+• \`.rules\` — Show group rules
+• \`.kick @user\` — Remove member
+• \`.promote @user\` — Make admin
+
+📱  *How to Use*
+• Send image + \`.sticker\` to create sticker
+• Reply to sticker with \`.toimg\` to convert
+• Group commands work only if you're group admin
+• Bot admin commands are restricted
+
+💡  *Need Help?*
+Contact a bot administrator for advanced features!
+`;
                         }
                         
-                        await sock.sendMessage(targetJid, { text: panelText }, { quoted: msg });
-                        console.log(`✅ Panel message sent successfully to: ${targetJid}`);
-                    } catch (sendError) {
+                        try {
+                            // Fix for self-chat: get correct target JID
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            if (targetJid !== from) {
+                                console.log(`🔄 Redirecting self-chat message from ${from} to ${targetJid}`);
+                            }
+                            
+                            await sock.sendMessage(targetJid, { text: panelText }, { quoted: msg });
+                            console.log(`✅ ${isAdmin ? 'Admin' : 'User'} panel sent successfully to: ${targetJid}`);
+                        } catch (sendError) {
                         console.error(`❌ Failed to send panel message to ${from}:`, sendError);
                         // Try sending without quoted message for self-chat
                         if (!isGroup) {
@@ -1382,56 +1456,135 @@ ${timeInfo.location}
                     case '.help': {
                         try {
                             const targetJid = getSelfChatTargetJid(senderJid, from);
-                            const helpText = `📚 *WhatsApp Bot v3 - Command Reference*
+                            const isUserAdmin = isBotAdmin;
+                            let helpText;
+                            
+                            if (isUserAdmin) {
+                                // Admin Help - Comprehensive guide
+                                helpText = `📚 *WhatsApp Bot v3 - Admin Command Reference*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🤖 **Basic Commands**
-• \`.help\` — Complete commands list
-• \`.stats\` — Bot statistics & uptime
-• \`.ping\` — Response time test
-• \`.about\` — Bot information
-• \`.panel\` — Main control panel
+👑 **Welcome, Administrator!**
+You have full access to all bot features and advanced controls.
 
-⚙️ **Bot Control**
+🎛️ **Bot Management** (Admin Only)
+• \`.panel\` — Admin control panel
 • \`.on\` / \`.off\` — Enable/disable bot
 • \`.autoread\` — Toggle auto view status
 • \`.anticall\` — Toggle call blocking
+• \`.status\` — Detailed system information
 
-🎨 **Media Commands**
+🔍 **Information & Debug**
+• \`.help\` — This admin command reference
+• \`.stats\` — Bot statistics & uptime
+• \`.ping\` — Response time test
+• \`.about\` — Bot technical information
+
+🎨 **Media Processing**
 • \`.sticker\` — Convert image to sticker
 • \`.toimg\` — Convert sticker to image
+*Note: Works with quoted messages or direct uploads*
 
 🛠️ **Advanced Tools**
-• \`.shorturl [url]\` — URL shortener
-• \`.color [name]\` — Color code lookup
-• \`.time\` — Current time & timezone
-• \`.pass [length]\` — Password generator
+• \`.shorturl [url]\` — URL shortener with TinyURL API
+• \`.color [name]\` — Complete color code lookup (HEX, RGB, HSL)
+• \`.time\` — Current time with timezone info
+• \`.pass [length]\` — Cryptographically secure password generator
 
-👥 **Group Commands** (Admin Only)
-• \`.ginfo\` — Group information
-• \`.tagall [msg]\` — Tag all members
-• \`.admins\` — List administrators
-• \`.members\` — Member statistics
-• \`.kick @user\` — Remove member
-• \`.promote @user\` — Make admin
-• \`.mute [duration]\` — Mute group
-• \`.warn @user\` — Issue warning
-• \`.antilink on/off\` — Link protection
+👥 **Group Management** (Requires Group Admin)
+• \`.ginfo\` — Detailed group analytics
+• \`.tagall [message]\` — Mention all members
+• \`.admins\` — List group administrators
+• \`.members\` — Comprehensive member statistics
+• \`.rules\` — Display/manage group rules
+• \`.kick @user\` — Remove member from group
+• \`.promote @user\` — Promote to admin
+• \`.demote @user\` — Remove admin privileges
+• \`.mute [duration]\` — Mute entire group
+• \`.muteuser @user [duration]\` — Mute individual user
+• \`.warn @user [reason]\` — Issue warning to user
+• \`.resetwarns @user\` — Clear user warnings
+• \`.groupstats\` — Advanced group analytics
+• \`.lock\` / \`.unlock\` — Control group settings
+• \`.antilink on/off\` — Toggle link protection
 
-🔒 **Security Features**
-• Admin permission validation
-• Self-chat message redirection
-• Comprehensive error handling
-• Secure auth data management
+🔒 **Admin Features**
+• Complete system access and control
+• Advanced error messages with debug info
+• Full group management capabilities
+• Bot configuration management
+• System monitoring and diagnostics
 
-💡 **Usage Tips:**
-• Commands work in groups & private chats
-• Group commands require admin privileges
-• Use \`.panel\` for interactive menu
-• Bot responds with helpful error messages
+💡 **Admin Tips:**
+• Use \`.panel\` for interactive admin control
+• Group commands work only with group admin privileges
+• Bot admin ≠ Group admin (both may be required)
+• Error messages include debug information for troubleshooting
 
-🚀 **Powered by Baileys Library**
+🚀 **Technical Details:**
+• Built with Baileys v6.6.0
+• Node.js 20+ with Sharp image processing
+• Persistent authentication with automatic backup
+• Self-chat redirection for optimal UX
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                            } else {
+                                // User Help - Simplified guide
+                                helpText = `📚 *WhatsApp Bot v3 - User Guide*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👋 **Welcome!**
+Here's everything you can do with this bot:
+
+🔍 **Information Commands**
+• \`.help\` — Show this user guide
+• \`.status\` — Bot status & information  
+• \`.panel\` — User menu with available commands
+
+🎨 **Media Features**
+• \`.sticker\` — Turn your image into a WhatsApp sticker
+• \`.toimg\` — Convert sticker back to image
+
+💡 **How to use media commands:**
+• Send an image, then type \`.sticker\`
+• Reply to an image with \`.sticker\`
+• Reply to a sticker with \`.toimg\`
+
+�️ **Useful Tools**
+• \`.shorturl [url]\` — Make long URLs short and easy to share
+• \`.color [name]\` — Get color codes (try: \`.color red\`)
+• \`.time\` — See current time and date
+• \`.pass [12]\` — Generate a secure password
+
+👥 **Group Features** (When you're group admin)
+• \`.ginfo\` — See group information
+• \`.tagall [message]\` — Mention everyone in the group
+• \`.admins\` — See who are the group admins
+• \`.members\` — Count group members
+• \`.rules\` — Show group rules
+• \`.kick @username\` — Remove someone from group
+• \`.promote @username\` — Make someone an admin
+
+📝 **Example Commands:**
+• \`.shorturl https://example.com/very/long/url\`
+• \`.color blue\`
+• \`.pass 16\`
+• \`.tagall Meeting in 5 minutes!\`
+
+🤝 **Need More Help?**
+• Use \`.panel\` for an interactive menu
+• Group commands only work if you're a group admin
+• Contact a bot administrator for advanced features
+• Bot admins have access to additional commands
+
+� **Tips for Best Experience:**
+• Images work best in JPG or PNG format
+• Be patient with media processing
+• Check your spelling when typing commands
+• Some features require specific permissions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                            }
                             
                             await sock.sendMessage(targetJid, { text: helpText }, { quoted: msg });
                         } catch (e) {
@@ -2460,9 +2613,16 @@ Try \`.ghelp\` for group commands.`;
                     default: {
                         console.log(`Unknown command: "${command}"`);
                         const targetJid = getSelfChatTargetJid(senderJid, from);
-                        await sock.sendMessage(targetJid, { 
-                            text: '❓ *Command Not Recognized*\n\n🤖 The command you entered is not available\n\n📋 *Get Help:*\n• Send `.panel` for full menu\n• Type `.ghelp` for group commands\n• Check spelling and try again\n\n💡 *Need assistance? Use our command panel!*' 
-                        }, { quoted: msg });
+                        const isUserAdmin = isBotAdmin;
+                        
+                        let helpMessage;
+                        if (isUserAdmin) {
+                            helpMessage = `❓ *Command Not Recognized (Admin)*\n\n🤖 The command "${command}" is not available\n\n🔧 *Admin Debug Info:*\n• Command: ${command}\n• From: ${senderJid}\n• Context: ${from.includes('@g.us') ? 'Group' : 'Private'}\n\n📋 *Get Help:*\n• Send \`.panel\` for admin control panel\n• Send \`.help\` for complete admin command list\n• Type \`.ghelp\` for group management commands\n• Check command spelling and syntax\n\n💡 *Admin Note:* If this should be a valid command, check the code or contact the developer!`;
+                        } else {
+                            helpMessage = `❓ *Command Not Recognized*\n\n🤖 The command "${command}" is not available to you\n\n📋 *Get Help:*\n• Send \`.panel\` for available commands\n• Send \`.help\` for user guide\n• Type \`.ghelp\` for group commands\n• Check your spelling and try again\n\n💡 *Tips:*\n• Some commands are admin-only\n• Make sure you're typing the command correctly\n• Contact a bot admin if you need special features!`;
+                        }
+                        
+                        await sock.sendMessage(targetJid, { text: helpMessage }, { quoted: msg });
                     }
                 }
             }
