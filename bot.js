@@ -692,18 +692,39 @@ async function getGroupInfo(sock, groupJid) {
 }
 
 async function createStickerFromImageBuffer(buffer) {
-    // Convert to webp using sharp
-    const webpBuffer = await sharp(buffer).webp({ quality: 90 }).toBuffer();
+    // Convert to webp using sharp with proper sticker dimensions
+    const webpBuffer = await sharp(buffer)
+        .resize(512, 512, { 
+            fit: 'contain', 
+            background: { r: 0, g: 0, b: 0, alpha: 0 } 
+        })
+        .webp({ quality: 90 })
+        .toBuffer();
     return webpBuffer;
 }
 
 async function createAnimatedStickerFromGif(buffer) {
-    // For GIF to animated sticker, we need to convert to animated webp
-    // Sharp can handle animated GIFs and convert to animated WebP
-    const animatedWebpBuffer = await sharp(buffer, { animated: true })
-        .webp({ quality: 90, effort: 4 })
-        .toBuffer();
-    return animatedWebpBuffer;
+    try {
+        // For GIF to animated sticker, convert to animated WebP
+        // Sharp handles animated GIFs automatically, so we just specify webp output
+        const animatedWebpBuffer = await sharp(buffer)
+            .webp({ quality: 90 })
+            .toBuffer();
+        return animatedWebpBuffer;
+    } catch (error) {
+        console.error('GIF to sticker conversion failed:', error.message);
+        // If WebP conversion fails, try static conversion
+        try {
+            const staticWebpBuffer = await sharp(buffer)
+                .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+                .webp({ quality: 90 })
+                .toBuffer();
+            return staticWebpBuffer;
+        } catch (staticError) {
+            console.error('Static GIF conversion also failed:', staticError.message);
+            throw new Error('Failed to convert GIF to sticker format');
+        }
+    }
 }
 
 async function convertStickerToImage(buffer) {
@@ -713,19 +734,30 @@ async function convertStickerToImage(buffer) {
 }
 
 async function convertStickerToGif(buffer) {
-    // Convert animated webp sticker to GIF using sharp
+    // Convert WebP sticker to GIF using sharp
     try {
-        // First try to convert as animated
-        const gifBuffer = await sharp(buffer, { animated: true })
-            .gif({ effort: 7, colours: 256 })
+        // Convert WebP to GIF format
+        const gifBuffer = await sharp(buffer)
+            .gif()
             .toBuffer();
         return gifBuffer;
     } catch (error) {
-        // If animated conversion fails, convert as static image to GIF
-        const gifBuffer = await sharp(buffer)
-            .gif({ colours: 256 })
-            .toBuffer();
-        return gifBuffer;
+        console.error('WebP to GIF conversion failed:', error.message);
+        // If direct conversion fails, try converting through PNG first
+        try {
+            const pngBuffer = await sharp(buffer)
+                .png()
+                .toBuffer();
+            
+            // Then convert PNG to GIF
+            const gifBuffer = await sharp(pngBuffer)
+                .gif()
+                .toBuffer();
+            return gifBuffer;
+        } catch (pngError) {
+            console.error('PNG intermediate conversion also failed:', pngError.message);
+            throw new Error('Failed to convert sticker to GIF format');
+        }
     }
 }
 
