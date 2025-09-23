@@ -479,6 +479,15 @@ function isImageMessage(msg) {
     return false;
 }
 
+function isGifMessage(msg) {
+    const m = msg.message || {};
+    if (m.videoMessage && m.videoMessage.gifPlayback) return true;
+    if (m.ephemeralMessage && m.ephemeralMessage.message?.videoMessage?.gifPlayback) return true;
+    if (m.viewOnceMessage && m.viewOnceMessage.message?.videoMessage?.gifPlayback) return true;
+    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.videoMessage?.gifPlayback) return true;
+    return false;
+}
+
 function isStickerMessage(msg) {
     const m = msg.message || {};
     if (m.stickerMessage) return true;
@@ -499,6 +508,21 @@ function extractImageMessage(msg) {
     }
     if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.imageMessage) {
         return { ...msg, message: { imageMessage: m.viewOnceMessageV2.message.imageMessage } };
+    }
+    return null;
+}
+
+function extractGifMessage(msg) {
+    const m = msg.message || {};
+    if (m.videoMessage && m.videoMessage.gifPlayback) return msg;
+    if (m.ephemeralMessage && m.ephemeralMessage.message?.videoMessage?.gifPlayback) {
+        return { ...msg, message: { videoMessage: m.ephemeralMessage.message.videoMessage } };
+    }
+    if (m.viewOnceMessage && m.viewOnceMessage.message?.videoMessage?.gifPlayback) {
+        return { ...msg, message: { videoMessage: m.viewOnceMessage.message.videoMessage } };
+    }
+    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.videoMessage?.gifPlayback) {
+        return { ...msg, message: { videoMessage: m.viewOnceMessageV2.message.videoMessage } };
     }
     return null;
 }
@@ -546,6 +570,13 @@ async function sendErrorMessage(sock, senderJid, fromJid, errorType, commandName
                 errorMessage = `❌ *Image Conversion Failed*\n\n🔧 *Admin Debug Info:*\n• Sticker format: WebP/AVIF conversion issue\n• Buffer processing: Sharp conversion error\n• Memory: Possible memory limitation\n\n💡 *Admin Actions:* Check memory usage, verify file integrity`;
             } else {
                 errorMessage = `❌ *Image Conversion Failed*\n\n� *What to try:*\n• Reply to a different sticker\n• Make sure it's an animated sticker\n• Try again in a moment\n\n💡 *Tip:* Some stickers work better than others!`;
+            }
+            break;
+        case 'TOGIF_FAILED':
+            if (isUserAdmin) {
+                errorMessage = `❌ *GIF Conversion Failed*\n\n🔧 *Admin Debug Info:*\n• Sticker format: WebP to GIF conversion issue\n• Animation: Possible animation processing error\n• Memory: Buffer processing limitation\n• Sharp: GIF encoding error\n\n💡 *Admin Actions:* Check Sharp GIF support, verify memory usage`;
+            } else {
+                errorMessage = `❌ *GIF Conversion Failed*\n\n🔧 *What to try:*\n• Try with a different sticker\n• Animated stickers work better\n• Try again in a moment\n\n💡 *Tip:* Some stickers may not convert to GIF format!`;
             }
             break;
         case 'MEDIA_DOWNLOAD_FAILED':
@@ -666,10 +697,36 @@ async function createStickerFromImageBuffer(buffer) {
     return webpBuffer;
 }
 
+async function createAnimatedStickerFromGif(buffer) {
+    // For GIF to animated sticker, we need to convert to animated webp
+    // Sharp can handle animated GIFs and convert to animated WebP
+    const animatedWebpBuffer = await sharp(buffer, { animated: true })
+        .webp({ quality: 90, effort: 4 })
+        .toBuffer();
+    return animatedWebpBuffer;
+}
+
 async function convertStickerToImage(buffer) {
     // Convert webp sticker to jpeg using sharp
     const jpegBuffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
     return jpegBuffer;
+}
+
+async function convertStickerToGif(buffer) {
+    // Convert animated webp sticker to GIF using sharp
+    try {
+        // First try to convert as animated
+        const gifBuffer = await sharp(buffer, { animated: true })
+            .gif({ effort: 7, colours: 256 })
+            .toBuffer();
+        return gifBuffer;
+    } catch (error) {
+        // If animated conversion fails, convert as static image to GIF
+        const gifBuffer = await sharp(buffer)
+            .gif({ colours: 256 })
+            .toBuffer();
+        return gifBuffer;
+    }
 }
 
 // Advanced Tools Functions
@@ -1058,8 +1115,9 @@ You have full access to all bot features and controls.
 • \`.status\` — Debug & system information
 
 🎨  *Media Commands*
-• \`.sticker\` — Convert image to sticker
+• \`.sticker\` — Convert image/GIF to sticker
 • \`.toimg\` — Convert sticker to image
+• \`.togif\` — Convert sticker to GIF
 
 🛠️  *Advanced Tools*
 • \`.shorturl [url]\` — URL shortener
@@ -1103,8 +1161,9 @@ Here are the commands available to you:
 • \`.status\` — Bot status & information
 
 🎨  *Media Commands*
-• \`.sticker\` — Convert image to sticker
+• \`.sticker\` — Convert image/GIF to sticker
 • \`.toimg\` — Convert sticker to image
+• \`.togif\` — Convert sticker to GIF
 
 🛠️  *Utility Tools*
 • \`.shorturl [url]\` — Shorten long URLs
@@ -1209,33 +1268,79 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         break;
                     }
                     case '.sticker': {
-                        // If the triggering message includes an image, use that; otherwise, check quoted
-                        let imageMsg = isImageMessage(msg) ? extractImageMessage(msg) : null;
-                        if (!imageMsg && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-                            const quoted = msg.message.extendedTextMessage.contextInfo.quotedMessage;
-                            if (quoted.imageMessage) imageMsg = { ...msg, message: { imageMessage: quoted.imageMessage } };
-                            else if (quoted.ephemeralMessage?.message?.imageMessage) imageMsg = { ...msg, message: { imageMessage: quoted.ephemeralMessage.message.imageMessage } };
-                            else if (quoted.viewOnceMessage?.message?.imageMessage) imageMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessage.message.imageMessage } };
-                            else if (quoted.viewOnceMessageV2?.message?.imageMessage) imageMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessageV2.message.imageMessage } };
+                        // Check for image or GIF in the triggering message or quoted message
+                        let mediaMsg = null;
+                        let isGif = false;
+                        
+                        // Check direct message for image or GIF
+                        if (isImageMessage(msg)) {
+                            mediaMsg = extractImageMessage(msg);
+                        } else if (isGifMessage(msg)) {
+                            mediaMsg = extractGifMessage(msg);
+                            isGif = true;
                         }
-                        if (!imageMsg) {
+                        
+                        // If not found, check quoted message
+                        if (!mediaMsg && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                            const quoted = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+                            
+                            // Check for image in quoted message
+                            if (quoted.imageMessage) {
+                                mediaMsg = { ...msg, message: { imageMessage: quoted.imageMessage } };
+                            } else if (quoted.ephemeralMessage?.message?.imageMessage) {
+                                mediaMsg = { ...msg, message: { imageMessage: quoted.ephemeralMessage.message.imageMessage } };
+                            } else if (quoted.viewOnceMessage?.message?.imageMessage) {
+                                mediaMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessage.message.imageMessage } };
+                            } else if (quoted.viewOnceMessageV2?.message?.imageMessage) {
+                                mediaMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessageV2.message.imageMessage } };
+                            }
+                            // Check for GIF in quoted message
+                            else if (quoted.videoMessage && quoted.videoMessage.gifPlayback) {
+                                mediaMsg = { ...msg, message: { videoMessage: quoted.videoMessage } };
+                                isGif = true;
+                            } else if (quoted.ephemeralMessage?.message?.videoMessage?.gifPlayback) {
+                                mediaMsg = { ...msg, message: { videoMessage: quoted.ephemeralMessage.message.videoMessage } };
+                                isGif = true;
+                            } else if (quoted.viewOnceMessage?.message?.videoMessage?.gifPlayback) {
+                                mediaMsg = { ...msg, message: { videoMessage: quoted.viewOnceMessage.message.videoMessage } };
+                                isGif = true;
+                            } else if (quoted.viewOnceMessageV2?.message?.videoMessage?.gifPlayback) {
+                                mediaMsg = { ...msg, message: { videoMessage: quoted.viewOnceMessageV2.message.videoMessage } };
+                                isGif = true;
+                            }
+                        }
+                        
+                        if (!mediaMsg) {
                             await sock.sendMessage(from, { 
-                                text: '🎨 *Sticker Creator*\n\n❌ No image detected!\n\n📷 *How to use:*\n• Send image with caption `.sticker`\n• Reply to any image with `.sticker`\n\n💡 *Tip:* Supports JPG, PNG, and WEBP formats' 
+                                text: '🎨 *Sticker Creator*\n\n❌ No image or GIF detected!\n\n📷 *How to use:*\n• Send image/GIF with caption `.sticker`\n• Reply to any image/GIF with `.sticker`\n\n💡 *Supports:* JPG, PNG, WEBP, and animated GIFs\n🎭 *GIFs become animated stickers!*' 
                             }, { quoted: msg });
                             break;
                         }
+                        
                         try {
                             const buffer = await downloadMediaMessage(
-                                imageMsg,
+                                mediaMsg,
                                 'buffer',
                                 {},
                                 { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
                             );
-                            const webp = await createStickerFromImageBuffer(buffer);
-                            await sock.sendMessage(from, { sticker: webp }, { quoted: msg });
-                            await sock.sendMessage(from, { 
-                                text: '� *Sticker Created Successfully!*\n\n✨ Your image has been converted to a sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new sticker!*' 
-                            }, { quoted: msg });
+                            
+                            let stickerBuffer;
+                            let successMessage;
+                            
+                            if (isGif) {
+                                // Convert GIF to animated sticker
+                                stickerBuffer = await createAnimatedStickerFromGif(buffer);
+                                successMessage = '🎭 *Animated Sticker Created!*\n\n✨ Your GIF has been converted to an animated sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new animated sticker!*';
+                            } else {
+                                // Convert image to static sticker
+                                stickerBuffer = await createStickerFromImageBuffer(buffer);
+                                successMessage = '🎨 *Sticker Created Successfully!*\n\n✨ Your image has been converted to a sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new sticker!*';
+                            }
+                            
+                            await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+                            await sock.sendMessage(from, { text: successMessage }, { quoted: msg });
+                            
                         } catch (e) {
                             console.error('Error creating sticker:', e);
                             await sendErrorMessage(sock, senderJid, from, 'STICKER_FAILED');
@@ -1273,6 +1378,41 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         } catch (e) {
                             console.error('Error converting sticker to image:', e);
                             await sendErrorMessage(sock, senderJid, from, 'TOIMG_FAILED');
+                        }
+                        break;
+                    }
+                    case '.togif': {
+                        // Check if the triggering message includes a sticker, or check quoted message
+                        let stickerMsg = isStickerMessage(msg) ? extractStickerMessage(msg) : null;
+                        if (!stickerMsg && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                            const quoted = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+                            if (quoted.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.stickerMessage } };
+                            else if (quoted.ephemeralMessage?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.ephemeralMessage.message.stickerMessage } };
+                            else if (quoted.viewOnceMessage?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.viewOnceMessage.message.stickerMessage } };
+                            else if (quoted.viewOnceMessageV2?.message?.stickerMessage) stickerMsg = { ...msg, message: { stickerMessage: quoted.viewOnceMessageV2.message.stickerMessage } };
+                        }
+                        if (!stickerMsg) {
+                            await sock.sendMessage(from, { 
+                                text: '🎭 *GIF Converter*\n\n❌ No sticker detected!\n\n🎯 *How to use:*\n• Send sticker with caption `.togif`\n• Reply to any sticker with `.togif`\n\n🔄 Convert stickers to animated GIFs!\n💡 *Works best with animated stickers*' 
+                            }, { quoted: msg });
+                            break;
+                        }
+                        try {
+                            const buffer = await downloadMediaMessage(
+                                stickerMsg,
+                                'buffer',
+                                {},
+                                { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+                            );
+                            const gifBuffer = await convertStickerToGif(buffer);
+                            await sock.sendMessage(from, { 
+                                video: gifBuffer,
+                                gifPlayback: true,
+                                caption: '🎭 *GIF Conversion Complete!*\n\n✅ Sticker successfully converted to GIF\n📱 Perfect for sharing animations!\n\n🎨 *Enjoy your GIF!*'
+                            }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error converting sticker to GIF:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'TOGIF_FAILED');
                         }
                         break;
                     }
@@ -1481,8 +1621,9 @@ You have full access to all bot features and advanced controls.
 • \`.about\` — Bot technical information
 
 🎨 **Media Processing**
-• \`.sticker\` — Convert image to sticker
+• \`.sticker\` — Convert image/GIF to sticker (supports animated GIFs)
 • \`.toimg\` — Convert sticker to image
+• \`.togif\` — Convert sticker to animated GIF
 *Note: Works with quoted messages or direct uploads*
 
 🛠️ **Advanced Tools**
@@ -1542,13 +1683,14 @@ Here's everything you can do with this bot:
 • \`.panel\` — User menu with available commands
 
 🎨 **Media Features**
-• \`.sticker\` — Turn your image into a WhatsApp sticker
+• \`.sticker\` — Turn your image or GIF into a WhatsApp sticker
 • \`.toimg\` — Convert sticker back to image
+• \`.togif\` — Convert animated sticker back to GIF
 
 💡 **How to use media commands:**
-• Send an image, then type \`.sticker\`
-• Reply to an image with \`.sticker\`
-• Reply to a sticker with \`.toimg\`
+• Send an image/GIF, then type \`.sticker\`
+• Reply to an image/GIF with \`.sticker\`
+• Reply to a sticker with \`.toimg\` or \`.togif\`
 
 �️ **Useful Tools**
 • \`.shorturl [url]\` — Make long URLs short and easy to share
