@@ -14,6 +14,9 @@ const crypto = require('crypto');
 const axios = require('axios');
 const http = require('http');
 const QRCode = require('qrcode');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+const ffprobeStatic = require('ffprobe-static');
 
 // Bot configuration
 const config = {
@@ -481,10 +484,32 @@ function isImageMessage(msg) {
 
 function isGifMessage(msg) {
     const m = msg.message || {};
-    if (m.videoMessage && m.videoMessage.gifPlayback) return true;
-    if (m.ephemeralMessage && m.ephemeralMessage.message?.videoMessage?.gifPlayback) return true;
-    if (m.viewOnceMessage && m.viewOnceMessage.message?.videoMessage?.gifPlayback) return true;
-    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.videoMessage?.gifPlayback) return true;
+    
+    // Check for video message with gifPlayback flag OR just video (WhatsApp sends GIFs as MP4)
+    if (m.videoMessage) {
+        // Accept any video that might be a GIF (including MP4)
+        if (m.videoMessage.gifPlayback || m.videoMessage.mimetype?.includes('mp4')) return true;
+    }
+    
+    if (m.ephemeralMessage && m.ephemeralMessage.message?.videoMessage) {
+        const video = m.ephemeralMessage.message.videoMessage;
+        if (video.gifPlayback || video.mimetype?.includes('mp4')) {
+            return true;
+        }
+    }
+    if (m.viewOnceMessage && m.viewOnceMessage.message?.videoMessage) {
+        const video = m.viewOnceMessage.message.videoMessage;
+        if (video.gifPlayback || video.mimetype?.includes('mp4')) {
+            return true;
+        }
+    }
+    if (m.viewOnceMessageV2 && m.viewOnceMessageV2.message?.videoMessage) {
+        const video = m.viewOnceMessageV2.message.videoMessage;
+        if (video.gifPlayback || video.mimetype?.includes('mp4')) {
+            return true;
+        }
+    }
+    
     return false;
 }
 
@@ -691,6 +716,85 @@ async function getGroupInfo(sock, groupJid) {
     }
 }
 
+// Set FFmpeg path
+ffmpeg.setFfmpegPath(ffmpegStatic);
+ffmpeg.setFfprobePath(ffprobeStatic.path);
+
+// Function to convert MP4 video to animated WebP sticker
+async function convertMP4ToAnimatedWebP(buffer) {
+    return new Promise((resolve, reject) => {
+        console.log('🎬 Starting MP4 to animated WebP conversion...');
+        const tempVideoPath = path.join(__dirname, `temp_video_${Date.now()}.mp4`);
+        const tempGifPath = path.join(__dirname, `temp_gif_${Date.now()}.gif`);
+        
+        try {
+            // Write video buffer to temporary file
+            console.log('📁 Writing video buffer to temp file...');
+            fs.writeFileSync(tempVideoPath, buffer);
+            console.log('✅ Video file written successfully');
+            
+            // Convert MP4 to GIF first using FFmpeg, then we'll convert GIF to WebP with Sharp
+            console.log('🔄 Starting FFmpeg MP4 to GIF conversion...');
+            ffmpeg(tempVideoPath)
+                .output(tempGifPath)
+                .outputOptions([
+                    '-vf', 'scale=512:512:force_original_aspect_ratio=decrease',
+                    '-t', '8',  // Limit to 8 seconds
+                    '-r', '15'  // 15 FPS for reasonable file size
+                ])
+                .on('start', (commandLine) => {
+                    console.log('🚀 FFmpeg command started:', commandLine);
+                })
+                .on('progress', (progress) => {
+                    console.log('⏳ Processing:', progress.percent + '%');
+                })
+                .on('end', async () => {
+                    try {
+                        console.log('✅ FFmpeg conversion completed, reading GIF...');
+                        // Read the GIF and convert to animated WebP using Sharp
+                        const gifBuffer = fs.readFileSync(tempGifPath);
+                        console.log('📊 GIF file size:', gifBuffer.length, 'bytes');
+                        
+                        console.log('🔄 Converting GIF to animated WebP with Sharp...');
+                        const webpBuffer = await sharp(gifBuffer, { animated: true })
+                            .resize(512, 512, { 
+                                fit: 'contain', 
+                                background: { r: 0, g: 0, b: 0, alpha: 0 } 
+                            })
+                            .webp({ quality: 90 })
+                            .toBuffer();
+                        
+                        console.log('✅ Sharp conversion completed, WebP size:', webpBuffer.length, 'bytes');
+                        
+                        // Clean up temporary files
+                        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                        if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                        console.log('🧹 Temporary files cleaned up');
+                        
+                        resolve(webpBuffer);
+                    } catch (error) {
+                        console.error('❌ Error during Sharp conversion:', error);
+                        // Clean up on error
+                        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                        if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                        reject(error);
+                    }
+                })
+                .on('error', (err) => {
+                    console.error('❌ FFmpeg conversion error:', err);
+                    // Clean up temporary files on error
+                    if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                    if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                    reject(err);
+                })
+                .run();
+        } catch (error) {
+            console.error('❌ File operation error:', error);
+            reject(error);
+        }
+    });
+}
+
 async function createStickerFromImageBuffer(buffer) {
     // Convert to webp using sharp with proper sticker dimensions
     const webpBuffer = await sharp(buffer)
@@ -705,25 +809,41 @@ async function createStickerFromImageBuffer(buffer) {
 
 async function createAnimatedStickerFromGif(buffer) {
     try {
-        // For GIF to animated sticker, convert to animated WebP
-        // Sharp handles animated GIFs automatically, so we just specify webp output
-        const animatedWebpBuffer = await sharp(buffer)
-            .webp({ quality: 90 })
-            .toBuffer();
-        return animatedWebpBuffer;
-    } catch (error) {
-        console.error('GIF to sticker conversion failed:', error.message);
-        // If WebP conversion fails, try static conversion
-        try {
-            const staticWebpBuffer = await sharp(buffer)
-                .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        // Check file format - could be GIF or MP4 (WhatsApp sends GIFs as MP4)
+        const firstBytes = buffer.toString('ascii', 0, 10);
+        let isActualGif = firstBytes.startsWith('GIF');
+        let isMp4 = buffer.includes(Buffer.from('ftyp')) || firstBytes.includes('ftyp');
+        
+        if (isMp4) {
+            // For MP4 videos, convert directly to animated WebP
+            const animatedWebpBuffer = await convertMP4ToAnimatedWebP(buffer);
+            return animatedWebpBuffer;
+        }
+        
+        // Handle actual GIF files with Sharp
+        if (isActualGif) {
+            const animatedWebpBuffer = await sharp(buffer)
+                .resize(512, 512, { 
+                    fit: 'contain', 
+                    background: { r: 0, g: 0, b: 0, alpha: 0 } 
+                })
                 .webp({ quality: 90 })
                 .toBuffer();
-            return staticWebpBuffer;
-        } catch (staticError) {
-            console.error('Static GIF conversion also failed:', staticError.message);
-            throw new Error('Failed to convert GIF to sticker format');
+            return animatedWebpBuffer;
         }
+        
+        // If we can't determine the format, try generic conversion with Sharp
+        const webpBuffer = await sharp(buffer)
+            .resize(512, 512, { 
+                fit: 'contain', 
+                background: { r: 0, g: 0, b: 0, alpha: 0 } 
+            })
+            .webp({ quality: 90 })
+            .toBuffer();
+        return webpBuffer;
+        
+    } catch (error) {
+        throw new Error('Failed to convert media to sticker format: ' + error.message);
     }
 }
 
@@ -1326,17 +1446,17 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             } else if (quoted.viewOnceMessageV2?.message?.imageMessage) {
                                 mediaMsg = { ...msg, message: { imageMessage: quoted.viewOnceMessageV2.message.imageMessage } };
                             }
-                            // Check for GIF in quoted message
-                            else if (quoted.videoMessage && quoted.videoMessage.gifPlayback) {
+                            // Check for video/GIF in quoted message
+                            else if (quoted.videoMessage) {
                                 mediaMsg = { ...msg, message: { videoMessage: quoted.videoMessage } };
-                                isGif = true;
-                            } else if (quoted.ephemeralMessage?.message?.videoMessage?.gifPlayback) {
+                                isGif = true; // Treat any quoted video as potential GIF
+                            } else if (quoted.ephemeralMessage?.message?.videoMessage) {
                                 mediaMsg = { ...msg, message: { videoMessage: quoted.ephemeralMessage.message.videoMessage } };
                                 isGif = true;
-                            } else if (quoted.viewOnceMessage?.message?.videoMessage?.gifPlayback) {
+                            } else if (quoted.viewOnceMessage?.message?.videoMessage) {
                                 mediaMsg = { ...msg, message: { videoMessage: quoted.viewOnceMessage.message.videoMessage } };
                                 isGif = true;
-                            } else if (quoted.viewOnceMessageV2?.message?.videoMessage?.gifPlayback) {
+                            } else if (quoted.viewOnceMessageV2?.message?.videoMessage) {
                                 mediaMsg = { ...msg, message: { videoMessage: quoted.viewOnceMessageV2.message.videoMessage } };
                                 isGif = true;
                             }
@@ -1344,7 +1464,7 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         
                         if (!mediaMsg) {
                             await sock.sendMessage(from, { 
-                                text: '🎨 *Sticker Creator*\n\n❌ No image or GIF detected!\n\n📷 *How to use:*\n• Send image/GIF with caption `.sticker`\n• Reply to any image/GIF with `.sticker`\n\n💡 *Supports:* JPG, PNG, WEBP, and animated GIFs\n🎭 *GIFs become animated stickers!*' 
+                                text: '🎨 *Sticker Creator*\n\n❌ No supported media detected!\n\n📷 *How to use:*\n• Send **image/video** with caption `.sticker`\n• Reply to any **image/video** with `.sticker`\n\n✅ *Supports:* JPG, PNG, WEBP, GIF files, and MP4 videos\n\n💡 *Tip:* MP4 videos will be converted to static stickers using the first frame!' 
                             }, { quoted: msg });
                             break;
                         }
