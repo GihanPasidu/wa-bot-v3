@@ -733,14 +733,15 @@ async function convertMP4ToAnimatedWebP(buffer) {
             fs.writeFileSync(tempVideoPath, buffer);
             console.log('✅ Video file written successfully');
             
-            // Convert MP4 to GIF first using FFmpeg, then we'll convert GIF to WebP with Sharp
+            // Convert MP4 to GIF first using FFmpeg with optimized settings for smaller file size
             console.log('🔄 Starting FFmpeg MP4 to GIF conversion...');
             ffmpeg(tempVideoPath)
                 .output(tempGifPath)
                 .outputOptions([
                     '-vf', 'scale=512:512:force_original_aspect_ratio=decrease',
-                    '-t', '8',  // Limit to 8 seconds
-                    '-r', '15'  // 15 FPS for reasonable file size
+                    '-t', '5',     // Limit to 5 seconds (shorter duration)
+                    '-r', '10',    // 10 FPS (lower framerate for smaller size)
+                    '-f', 'gif'
                 ])
                 .on('start', (commandLine) => {
                     console.log('🚀 FFmpeg command started:', commandLine);
@@ -751,7 +752,7 @@ async function convertMP4ToAnimatedWebP(buffer) {
                 .on('end', async () => {
                     try {
                         console.log('✅ FFmpeg conversion completed, reading GIF...');
-                        // Read the GIF and convert to animated WebP using Sharp
+                        // Read the GIF and convert to animated WebP using Sharp with optimized settings
                         const gifBuffer = fs.readFileSync(tempGifPath);
                         console.log('📊 GIF file size:', gifBuffer.length, 'bytes');
                         
@@ -761,17 +762,47 @@ async function convertMP4ToAnimatedWebP(buffer) {
                                 fit: 'contain', 
                                 background: { r: 0, g: 0, b: 0, alpha: 0 } 
                             })
-                            .webp({ quality: 90 })
+                            .webp({ 
+                                quality: 60,     // Lower quality for smaller file size
+                                effort: 6,       // Higher effort for better compression
+                                method: 6        // Better compression method
+                            })
                             .toBuffer();
                         
                         console.log('✅ Sharp conversion completed, WebP size:', webpBuffer.length, 'bytes');
                         
-                        // Clean up temporary files
-                        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
-                        if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
-                        console.log('🧹 Temporary files cleaned up');
-                        
-                        resolve(webpBuffer);
+                        // Check if file is still too large
+                        if (webpBuffer.length > 500000) { // 500KB limit
+                            console.log('⚠️ File still too large, applying additional compression...');
+                            // Try with even lower quality and smaller size
+                            const compressedWebpBuffer = await sharp(gifBuffer, { animated: true })
+                                .resize(400, 400, { 
+                                    fit: 'contain', 
+                                    background: { r: 0, g: 0, b: 0, alpha: 0 } 
+                                })
+                                .webp({ 
+                                    quality: 40,     // Much lower quality
+                                    effort: 6,
+                                    method: 6
+                                })
+                                .toBuffer();
+                            
+                            console.log('✅ Compressed WebP size:', compressedWebpBuffer.length, 'bytes');
+                            
+                            // Clean up temporary files
+                            if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                            if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                            console.log('🧹 Temporary files cleaned up');
+                            
+                            resolve(compressedWebpBuffer);
+                        } else {
+                            // Clean up temporary files
+                            if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                            if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
+                            console.log('🧹 Temporary files cleaned up');
+                            
+                            resolve(webpBuffer);
+                        }
                     } catch (error) {
                         console.error('❌ Error during Sharp conversion:', error);
                         // Clean up on error
@@ -796,14 +827,38 @@ async function convertMP4ToAnimatedWebP(buffer) {
 }
 
 async function createStickerFromImageBuffer(buffer) {
-    // Convert to webp using sharp with proper sticker dimensions
+    // Convert to webp using sharp with proper sticker dimensions and optimized compression
     const webpBuffer = await sharp(buffer)
         .resize(512, 512, { 
             fit: 'contain', 
             background: { r: 0, g: 0, b: 0, alpha: 0 } 
         })
-        .webp({ quality: 90 })
+        .webp({ 
+            quality: 80,    // Good quality but compressed
+            effort: 6,      // Higher effort for better compression
+            method: 6       // Better compression method
+        })
         .toBuffer();
+    
+    // Check if file is too large for WhatsApp
+    if (webpBuffer.length > 500000) { // 500KB limit
+        console.log('⚠️ Static sticker too large, applying compression...');
+        // Try with lower quality
+        const compressedBuffer = await sharp(buffer)
+            .resize(512, 512, { 
+                fit: 'contain', 
+                background: { r: 0, g: 0, b: 0, alpha: 0 } 
+            })
+            .webp({ 
+                quality: 60,    // Lower quality for smaller file
+                effort: 6,
+                method: 6
+            })
+            .toBuffer();
+        console.log('✅ Compressed static sticker size:', compressedBuffer.length, 'bytes');
+        return compressedBuffer;
+    }
+    
     return webpBuffer;
 }
 
@@ -854,17 +909,42 @@ async function convertStickerToImage(buffer) {
 }
 
 async function convertStickerToGif(buffer) {
-    // Convert WebP sticker to GIF using sharp
+    // Convert WebP sticker to GIF
     try {
-        // Convert WebP to GIF format
-        const gifBuffer = await sharp(buffer)
-            .gif()
-            .toBuffer();
-        return gifBuffer;
+        console.log('🔄 Attempting WebP to GIF conversion with Sharp...');
+        
+        // First, let's check if it's an animated WebP
+        const metadata = await sharp(buffer).metadata();
+        console.log('📊 Sticker metadata:', {
+            format: metadata.format,
+            width: metadata.width,
+            height: metadata.height,
+            pages: metadata.pages
+        });
+        
+        if (metadata.pages && metadata.pages > 1) {
+            // It's animated - Sharp can handle this
+            console.log('🎬 Detected animated WebP with', metadata.pages, 'frames');
+            const gifBuffer = await sharp(buffer, { animated: true })
+                .gif()
+                .toBuffer();
+            console.log('✅ Animated WebP to GIF conversion successful');
+            return gifBuffer;
+        } else {
+            // Static sticker - convert normally
+            console.log('🖼️ Detected static WebP');
+            const gifBuffer = await sharp(buffer)
+                .gif()
+                .toBuffer();
+            console.log('✅ Static WebP to GIF conversion successful');
+            return gifBuffer;
+        }
     } catch (error) {
-        console.error('WebP to GIF conversion failed:', error.message);
-        // If direct conversion fails, try converting through PNG first
+        console.error('❌ WebP to GIF conversion failed:', error.message);
+        
+        // Fallback: try converting through PNG first
         try {
+            console.log('🔄 Trying fallback PNG conversion...');
             const pngBuffer = await sharp(buffer)
                 .png()
                 .toBuffer();
@@ -873,10 +953,11 @@ async function convertStickerToGif(buffer) {
             const gifBuffer = await sharp(pngBuffer)
                 .gif()
                 .toBuffer();
+            console.log('✅ PNG fallback conversion successful');
             return gifBuffer;
         } catch (pngError) {
-            console.error('PNG intermediate conversion also failed:', pngError.message);
-            throw new Error('Failed to convert sticker to GIF format');
+            console.error('❌ PNG intermediate conversion also failed:', pngError.message);
+            throw new Error('Failed to convert sticker to GIF format: ' + pngError.message);
         }
     }
 }
@@ -1483,11 +1564,13 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             if (isGif) {
                                 // Convert GIF to animated sticker
                                 stickerBuffer = await createAnimatedStickerFromGif(buffer);
-                                successMessage = '🎭 *Animated Sticker Created!*\n\n✨ Your GIF has been converted to an animated sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new animated sticker!*';
+                                const fileSizeKB = Math.round(stickerBuffer.length / 1024);
+                                successMessage = `🎭 *Animated Sticker Created!*\n\n✨ Your GIF has been converted to an animated sticker\n📊 File size: ${fileSizeKB}KB (optimized for WhatsApp)\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new animated sticker!*`;
                             } else {
                                 // Convert image to static sticker
                                 stickerBuffer = await createStickerFromImageBuffer(buffer);
-                                successMessage = '🎨 *Sticker Created Successfully!*\n\n✨ Your image has been converted to a sticker\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new sticker!*';
+                                const fileSizeKB = Math.round(stickerBuffer.length / 1024);
+                                successMessage = `🎨 *Sticker Created Successfully!*\n\n✨ Your image has been converted to a sticker\n📊 File size: ${fileSizeKB}KB (optimized for WhatsApp)\n🚀 Ready to use in chats!\n\n💫 *Enjoy your new sticker!*`;
                             }
                             
                             await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
@@ -1550,13 +1633,16 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             break;
                         }
                         try {
+                            console.log('🎭 Starting sticker to GIF conversion...');
                             const buffer = await downloadMediaMessage(
                                 stickerMsg,
                                 'buffer',
                                 {},
                                 { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
                             );
+                            console.log('📥 Downloaded sticker buffer, size:', buffer.length, 'bytes');
                             const gifBuffer = await convertStickerToGif(buffer);
+                            console.log('✅ GIF conversion completed, size:', gifBuffer.length, 'bytes');
                             await sock.sendMessage(from, { 
                                 video: gifBuffer,
                                 gifPlayback: true,
