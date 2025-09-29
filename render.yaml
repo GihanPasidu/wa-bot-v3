@@ -12,6 +12,6 @@ services:
       - key: PORT
         value: 10000
       - key: RENDER_EXTERNAL_URL
-        value: https://whatsapp-bot-v3.onrender.com
+        value: https://wa-bot-v3-5f7s.onrender.com
     autoDeploy: true
     healthCheckPath: /health
