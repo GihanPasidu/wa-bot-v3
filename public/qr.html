@@ -1785,6 +1785,7 @@
         let performanceChart;
         let qrStartTime = Date.now();
         let refreshCount = 0;
+        let successAnimationShown = false; // Flag to prevent repeated animations
         let systemMetrics = {
             latency: [],
             memory: [],
@@ -2096,6 +2097,9 @@
                 const statusValue = document.getElementById('status-value');
                 
                 if (data.qr) {
+                    // Reset success animation flag for new connection attempt
+                    successAnimationShown = false;
+                    
                     container.innerHTML = `
                         <img src="data:image/png;base64,${data.qr}" 
                              alt="WhatsApp QR Code" 
@@ -2142,10 +2146,14 @@
                     clearInterval(refreshInterval);
                     clearInterval(countdownInterval);
                     document.getElementById('refresh-btn').style.display = 'none';
+                    // Hide the refresh timer since we're connected
                     document.querySelector('.refresh-timer').style.display = 'none';
                     
-                    // Show success animation
-                    showSuccessAnimation();
+                    // Show success animation only once per session
+                    if (!successAnimationShown) {
+                        showSuccessAnimation();
+                        successAnimationShown = true;
+                    }
                     techFeatures.addTerminalLine('✓ WhatsApp connection established', 'success');
                     
                 } else if (data.status === 'disconnected') {
@@ -2223,22 +2231,44 @@
             statusValue.textContent = 'Error';
         }
 
-        // Show success animation
+        // Show success animation (runs only once per session)
         function showSuccessAnimation() {
-            // Create confetti effect
-            for (let i = 0; i < 50; i++) {
+            // Check if user prefers reduced motion
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                console.log('🎉 Connection successful! (Animation disabled - reduced motion preference)');
+                return;
+            }
+            
+            // Check if animation has already been shown
+            if (successAnimationShown) {
+                console.log('🎉 Connection successful! (Animation already shown this session)');
+                return;
+            }
+            
+            console.log('🎉 Showing connection success animation');
+            
+            // Create a single burst of confetti
+            const confettiCount = 25; // Reduced count for better performance
+            
+            for (let i = 0; i < confettiCount; i++) {
                 setTimeout(() => {
                     createConfetti();
-                }, i * 50);
+                }, i * 40); // Slightly faster intervals
             }
+            
+            // Clear any existing confetti after animation completes
+            setTimeout(() => {
+                cleanupConfetti();
+            }, 3500); // Clean up after animation duration
         }
 
         function createConfetti() {
             const confetti = document.createElement('div');
+            confetti.className = 'confetti-particle'; // Add class for easier cleanup
             confetti.style.position = 'fixed';
-            confetti.style.width = '10px';
-            confetti.style.height = '10px';
-            confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 50%, 50%)`;
+            confetti.style.width = '8px';
+            confetti.style.height = '8px';
+            confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
             confetti.style.left = Math.random() * window.innerWidth + 'px';
             confetti.style.top = '-10px';
             confetti.style.zIndex = '9999';
@@ -2251,11 +2281,25 @@
                 { transform: 'translateY(0) rotateZ(0deg)', opacity: 1 },
                 { transform: `translateY(${window.innerHeight + 20}px) rotateZ(360deg)`, opacity: 0 }
             ], {
-                duration: 3000,
+                duration: 2500, // Slightly faster animation
                 easing: 'cubic-bezier(0.5, 0, 0.5, 1)'
             });
             
-            animation.onfinish = () => confetti.remove();
+            animation.onfinish = () => {
+                if (confetti.parentNode) {
+                    confetti.remove();
+                }
+            };
+        }
+
+        // Clean up any remaining confetti particles
+        function cleanupConfetti() {
+            const remainingConfetti = document.querySelectorAll('.confetti-particle');
+            remainingConfetti.forEach(particle => {
+                if (particle.parentNode) {
+                    particle.remove();
+                }
+            });
         }
 
         // Enhanced refresh function
@@ -2360,6 +2404,9 @@
 
         // Initialize on page load
         window.addEventListener('load', () => {
+            // Clean up any leftover confetti from previous sessions
+            cleanupConfetti();
+            
             createParticles();
             techFeatures = new AdvancedTechFeatures();
             fetchQRCode();
