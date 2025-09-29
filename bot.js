@@ -48,6 +48,10 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
+// Backup throttling to prevent excessive backup calls
+let lastBackupTime = 0;
+const BACKUP_COOLDOWN = 30000; // 30 seconds between backups
+
 // Persistent auth storage for Render deployments
 const PERSISTENT_AUTH_KEYS = [
     'BAILEYS_CREDS',
@@ -55,15 +59,22 @@ const PERSISTENT_AUTH_KEYS = [
 ];
 
 // Enhanced auth persistence with multiple storage methods
-function backupAuthToEnv(authState) {
+function backupAuthToEnv(authState, forceBackup = false) {
     try {
+        // Throttle backup calls to prevent spam (except when forced)
+        const now = Date.now();
+        if (!forceBackup && (now - lastBackupTime) < BACKUP_COOLDOWN) {
+            console.log(`⏱️ Backup throttled (last backup ${Math.round((now - lastBackupTime) / 1000)}s ago)`);
+            return;
+        }
+        
         if (authState.creds || authState.keys) {
             console.log('🔐 Backing up authentication credentials...');
+            lastBackupTime = now;
             
             // Render-optimized backup locations with fallbacks
             const backupLocations = [
-                '/opt/render/project/src/auth-backup',  // Render persistent storage
-                './auth-backup',                         // Local backup
+                './auth-backup',                         // Local backup (works on Render)
                 '/tmp/auth-backup',                      // Temporary storage
                 process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
             ].filter(Boolean);
@@ -184,8 +195,7 @@ function restoreAuthFromBackup() {
     try {
         // Check multiple backup locations (Render-optimized)
         const backupLocations = [
-            '/opt/render/project/src/auth-backup',  // Render persistent storage
-            './auth-backup',                         // Local backup
+            './auth-backup',                         // Local backup (works on Render)
             '/tmp/auth-backup',                      // Temporary storage
             process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
         ].filter(Boolean);
@@ -405,8 +415,7 @@ function verifyBackupIntegrity() {
     console.log('🔍 Verifying backup integrity...');
     
     const backupLocations = [
-        '/opt/render/project/src/auth-backup',  // Render persistent storage
-        './auth-backup',                         // Local backup
+        './auth-backup',                         // Local backup (works on Render)
         '/tmp/auth-backup',                      // Temporary storage
         process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
     ].filter(Boolean);
@@ -1460,13 +1469,13 @@ async function startBot() {
             await originalSaveCreds();
             console.log('💾 Auth credentials saved to local files');
             
-            // Then backup for persistence across deployments
+            // Then backup for persistence across deployments (throttled)
             setTimeout(() => {
                 try {
                     backupAuthToEnv({ 
                         creds: state.creds, 
                         keys: state.keys 
-                    });
+                    }); // Use throttled backup for automatic saves
                 } catch (backupError) {
                     console.error('❌ Failed to backup auth data:', backupError.message);
                 }
@@ -1474,12 +1483,12 @@ async function startBot() {
             
         } catch (saveError) {
             console.error('❌ Failed to save credentials:', saveError.message);
-            // Still try to backup what we have
+            // Still try to backup what we have (throttled)
             try {
                 backupAuthToEnv({ 
                     creds: state.creds, 
                     keys: state.keys 
-                });
+                }); // Use throttled backup for automatic saves
             } catch (backupError) {
                 console.error('❌ Failed to backup auth data after save error:', backupError.message);
             }
@@ -1538,7 +1547,7 @@ async function startBot() {
                         backupAuthToEnv({ 
                             creds: state.creds, 
                             keys: state.keys 
-                        });
+                        }, true); // Force backup on connection
                         console.log(`💾 Authentication data backed up successfully (attempt ${attempt}/3)`);
                         break; // Success, exit retry loop
                     } catch (error) {
@@ -1876,7 +1885,7 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             backupAuthToEnv({ 
                                 creds: state.creds, 
                                 keys: state.keys 
-                            });
+                            }, true); // Force backup for testing
                             
                             // Check again after backup
                             const hasValidBackupAfter = verifyBackupIntegrity();
@@ -1906,8 +1915,7 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
 • 🔍 After Test: ${hasValidBackupAfter ? '✅ Valid backup found' : '❌ No valid backup'}
 
 🗂️ *Backup Locations Checked:*
-• /opt/render/project/src/auth-backup (Render persistent)
-• ./auth-backup (Local)
+• ./auth-backup (Local - works on Render)
 • /tmp/auth-backup (Temporary)
 • ~/.wa-bot-backup (Home directory)
 
