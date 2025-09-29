@@ -57,53 +57,185 @@ const PERSISTENT_AUTH_KEYS = [
 // Enhanced auth persistence with multiple storage methods
 function backupAuthToEnv(authState) {
     try {
-        if (authState.creds) {
+        if (authState.creds || authState.keys) {
             console.log('🔐 Backing up authentication credentials...');
-            // Store in a persistent location that survives deployments
-            const authBackupDir = '/tmp/auth-backup';
-            if (!fs.existsSync(authBackupDir)) {
-                fs.mkdirSync(authBackupDir, { recursive: true });
+            
+            // Multiple backup locations for better persistence
+            const backupLocations = [
+                '/tmp/auth-backup',      // Primary location
+                './auth-backup',         // Secondary location
+                process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
+            ].filter(Boolean);
+            
+            let backupSuccess = false;
+            
+            for (const authBackupDir of backupLocations) {
+                try {
+                    // Ensure backup directory exists
+                    if (!fs.existsSync(authBackupDir)) {
+                        fs.mkdirSync(authBackupDir, { recursive: true });
+                    }
+                    
+                    // Create comprehensive backup object
+                    const backupData = {
+                        creds: authState.creds || null,
+                        keys: authState.keys || {},
+                        timestamp: Date.now(),
+                        version: '3.0.0'
+                    };
+                    
+                    // Save complete auth state
+                    fs.writeFileSync(
+                        path.join(authBackupDir, 'auth-complete-backup.json'), 
+                        JSON.stringify(backupData, null, 2)
+                    );
+                    
+                    // Save individual components for redundancy
+                    if (authState.creds) {
+                        fs.writeFileSync(
+                            path.join(authBackupDir, 'creds-backup.json'), 
+                            JSON.stringify(authState.creds, null, 2)
+                        );
+                    }
+                    
+                    if (authState.keys && Object.keys(authState.keys).length > 0) {
+                        fs.writeFileSync(
+                            path.join(authBackupDir, 'keys-backup.json'), 
+                            JSON.stringify(authState.keys, null, 2)
+                        );
+                    }
+                    
+                    // Save metadata
+                    fs.writeFileSync(
+                        path.join(authBackupDir, 'backup-info.json'), 
+                        JSON.stringify({
+                            timestamp: Date.now(),
+                            location: authBackupDir,
+                            hasKeys: !!(authState.keys && Object.keys(authState.keys).length > 0),
+                            hasCreds: !!authState.creds,
+                            version: '3.0.0'
+                        }, null, 2)
+                    );
+                    
+                    backupSuccess = true;
+                    console.log(`✅ Authentication data backed up to: ${authBackupDir}`);
+                    break; // Success, no need to try other locations
+                    
+                } catch (dirError) {
+                    console.warn(`⚠️ Failed to backup to ${authBackupDir}:`, dirError.message);
+                    continue; // Try next location
+                }
             }
             
-            // Save to persistent tmp location
-            fs.writeFileSync(path.join(authBackupDir, 'creds-backup.json'), JSON.stringify(authState.creds, null, 2));
+            if (!backupSuccess) {
+                throw new Error('All backup locations failed');
+            }
             
-            // Also save a timestamp
-            fs.writeFileSync(path.join(authBackupDir, 'backup-timestamp.txt'), Date.now().toString());
-            
-            console.log('✅ Authentication data backed up successfully');
+        } else {
+            console.log('⚠️ No auth data to backup (creds and keys are empty)');
         }
     } catch (error) {
-        console.error('❌ Error backing up auth data:', error);
+        console.error('❌ Error backing up auth data:', error.message);
     }
 }
 
 function restoreAuthFromBackup() {
     try {
-        const authBackupDir = '/tmp/auth-backup';
-        const credsBackupPath = path.join(authBackupDir, 'creds-backup.json');
-        const timestampPath = path.join(authBackupDir, 'backup-timestamp.txt');
+        // Check multiple backup locations
+        const backupLocations = [
+            '/tmp/auth-backup',
+            './auth-backup',
+            process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null
+        ].filter(Boolean);
         
-        if (fs.existsSync(credsBackupPath)) {
-            const backupAge = Date.now() - parseInt(fs.readFileSync(timestampPath, 'utf8') || '0');
-            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-            
-            if (backupAge < maxAge) {
-                console.log('🔄 Restoring authentication from backup...');
-                const credsData = JSON.parse(fs.readFileSync(credsBackupPath, 'utf8'));
-                return { creds: credsData };
-            } else {
-                console.log('⏰ Auth backup is too old, will generate new QR code');
-                // Clean up old backup
-                fs.unlinkSync(credsBackupPath);
-                fs.unlinkSync(timestampPath);
+        for (const authBackupDir of backupLocations) {
+            try {
+                const completeBackupPath = path.join(authBackupDir, 'auth-complete-backup.json');
+                const credsBackupPath = path.join(authBackupDir, 'creds-backup.json');
+                const keysBackupPath = path.join(authBackupDir, 'keys-backup.json');
+                const infoPath = path.join(authBackupDir, 'backup-info.json');
+                
+                // Check if backup directory exists
+                if (!fs.existsSync(authBackupDir)) {
+                    continue;
+                }
+                
+                let backupData = null;
+                let backupAge = 0;
+                
+                // Try to restore from complete backup first
+                if (fs.existsSync(completeBackupPath)) {
+                    const completeData = JSON.parse(fs.readFileSync(completeBackupPath, 'utf8'));
+                    backupAge = Date.now() - (completeData.timestamp || 0);
+                    backupData = completeData;
+                    console.log(`🔍 Found complete backup in: ${authBackupDir}`);
+                }
+                // Fallback to individual files
+                else if (fs.existsSync(credsBackupPath)) {
+                    const credsData = JSON.parse(fs.readFileSync(credsBackupPath, 'utf8'));
+                    let keysData = {};
+                    
+                    if (fs.existsSync(keysBackupPath)) {
+                        keysData = JSON.parse(fs.readFileSync(keysBackupPath, 'utf8'));
+                    }
+                    
+                    // Get timestamp from info file or file modification time
+                    if (fs.existsSync(infoPath)) {
+                        const info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
+                        backupAge = Date.now() - (info.timestamp || 0);
+                    } else {
+                        const stats = fs.statSync(credsBackupPath);
+                        backupAge = Date.now() - stats.mtime.getTime();
+                    }
+                    
+                    backupData = {
+                        creds: credsData,
+                        keys: keysData,
+                        timestamp: Date.now() - backupAge
+                    };
+                    console.log(`🔍 Found individual backup files in: ${authBackupDir}`);
+                }
+                
+                if (backupData && backupData.creds) {
+                    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+                    
+                    if (backupAge < maxAge) {
+                        console.log(`🔄 Restoring authentication from backup (age: ${Math.round(backupAge / (1000 * 60 * 60))} hours)...`);
+                        
+                        return {
+                            creds: backupData.creds,
+                            keys: backupData.keys || {},
+                            isRestored: true,
+                            backupLocation: authBackupDir,
+                            backupAge: backupAge
+                        };
+                    } else {
+                        console.log(`⏰ Auth backup is too old (${Math.round(backupAge / (1000 * 60 * 60 * 24))} days), cleaning up...`);
+                        
+                        // Clean up old backup files
+                        try {
+                            if (fs.existsSync(completeBackupPath)) fs.unlinkSync(completeBackupPath);
+                            if (fs.existsSync(credsBackupPath)) fs.unlinkSync(credsBackupPath);
+                            if (fs.existsSync(keysBackupPath)) fs.unlinkSync(keysBackupPath);
+                            if (fs.existsSync(infoPath)) fs.unlinkSync(infoPath);
+                            console.log(`🧹 Cleaned up old backup in: ${authBackupDir}`);
+                        } catch (cleanupError) {
+                            console.warn(`⚠️ Failed to cleanup old backup: ${cleanupError.message}`);
+                        }
+                    }
+                }
+                
+            } catch (dirError) {
+                console.warn(`⚠️ Error checking backup in ${authBackupDir}:`, dirError.message);
+                continue;
             }
         }
         
-        console.log('📝 No valid auth backup found, will need fresh authentication');
+        console.log('📝 No valid auth backup found in any location');
         return null;
+        
     } catch (error) {
-        console.error('❌ Error restoring auth backup:', error);
+        console.error('❌ Error restoring auth backup:', error.message);
         return null;
     }
 }
@@ -124,29 +256,123 @@ async function getAuthState() {
         
         // Check if we have valid credentials
         if (authState.creds && Object.keys(authState.creds).length > 0) {
-            console.log('✅ Using existing authentication data');
+            console.log('✅ Using existing authentication data from auth directory');
             return authState;
         }
         
         // If no valid local auth, try to restore from backup
+        console.log('🔍 No local auth found, checking for backups...');
         const restoredAuth = restoreAuthFromBackup();
-        if (restoredAuth) {
-            // Write restored data to files
-            fs.writeFileSync(path.join(authDir, 'creds.json'), JSON.stringify(restoredAuth.creds, null, 2));
-            console.log('🔄 Restored authentication from backup storage');
+        
+        if (restoredAuth && restoredAuth.creds) {
+            console.log(`🔄 Restoring authentication from backup location: ${restoredAuth.backupLocation}`);
             
-            // Return fresh auth state with restored data
-            return await useMultiFileAuthState(authDir);
+            try {
+                // Write restored credentials to auth directory
+                if (restoredAuth.creds) {
+                    fs.writeFileSync(
+                        path.join(authDir, 'creds.json'), 
+                        JSON.stringify(restoredAuth.creds, null, 2)
+                    );
+                    console.log('� Restored credentials to auth directory');
+                }
+                
+                // Write restored keys if available
+                if (restoredAuth.keys && Object.keys(restoredAuth.keys).length > 0) {
+                    // Write each key file individually (Baileys expects separate files)
+                    for (const [keyName, keyData] of Object.entries(restoredAuth.keys)) {
+                        if (keyData && typeof keyData === 'object') {
+                            fs.writeFileSync(
+                                path.join(authDir, `${keyName}.json`),
+                                JSON.stringify(keyData, null, 2)
+                            );
+                        }
+                    }
+                    console.log(`💾 Restored ${Object.keys(restoredAuth.keys).length} key files to auth directory`);
+                }
+                
+                // Return fresh auth state with restored data
+                const newAuthState = await useMultiFileAuthState(authDir);
+                console.log('✅ Successfully restored authentication from backup');
+                return newAuthState;
+                
+            } catch (restoreError) {
+                console.error('❌ Error writing restored auth data:', restoreError.message);
+                console.log('🔄 Falling back to fresh authentication');
+            }
         }
         
-        console.log('🆕 No existing authentication found, will generate new QR code');
+        console.log('🆕 No valid backup found, will generate new QR code');
         return authState;
         
     } catch (error) {
-        console.error('❌ Error setting up auth state:', error);
+        console.error('❌ Error setting up auth state:', error.message);
+        console.log('🔄 Falling back to fresh auth state');
+        
         // Fallback to fresh auth state
-        return await useMultiFileAuthState(authDir);
+        try {
+            return await useMultiFileAuthState(authDir);
+        } catch (fallbackError) {
+            console.error('❌ Critical error: Cannot create auth state:', fallbackError.message);
+            throw fallbackError;
+        }
     }
+}
+
+// Function to verify backup integrity
+function verifyBackupIntegrity() {
+    console.log('🔍 Verifying backup integrity...');
+    
+    const backupLocations = [
+        '/tmp/auth-backup',
+        './auth-backup',
+        process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null
+    ].filter(Boolean);
+    
+    let foundBackups = 0;
+    
+    for (const location of backupLocations) {
+        try {
+            if (fs.existsSync(location)) {
+                const completeBackup = path.join(location, 'auth-complete-backup.json');
+                const credsBackup = path.join(location, 'creds-backup.json');
+                const infoFile = path.join(location, 'backup-info.json');
+                
+                let status = '❌ Invalid';
+                let hasComplete = fs.existsSync(completeBackup);
+                let hasCreds = fs.existsSync(credsBackup);
+                let hasInfo = fs.existsSync(infoFile);
+                
+                if (hasComplete || hasCreds) {
+                    try {
+                        if (hasComplete) {
+                            const data = JSON.parse(fs.readFileSync(completeBackup, 'utf8'));
+                            if (data.creds && data.timestamp) {
+                                const age = Date.now() - data.timestamp;
+                                status = age < (7 * 24 * 60 * 60 * 1000) ? '✅ Valid' : '⏰ Expired';
+                                foundBackups++;
+                            }
+                        } else if (hasCreds) {
+                            JSON.parse(fs.readFileSync(credsBackup, 'utf8'));
+                            status = '✅ Valid (partial)';
+                            foundBackups++;
+                        }
+                    } catch (parseError) {
+                        status = '❌ Corrupted';
+                    }
+                }
+                
+                console.log(`📁 ${location}: ${status} (Complete: ${hasComplete}, Creds: ${hasCreds}, Info: ${hasInfo})`);
+            } else {
+                console.log(`📁 ${location}: Not found`);
+            }
+        } catch (error) {
+            console.log(`📁 ${location}: Error - ${error.message}`);
+        }
+    }
+    
+    console.log(`📊 Backup Summary: ${foundBackups} valid backup(s) found`);
+    return foundBackups > 0;
 }
 
 // Warning system functions
@@ -1105,6 +1331,9 @@ function getSriLankaTime() {
 }
 
 async function startBot() {
+    console.log('🔍 Checking for existing auth backups...');
+    verifyBackupIntegrity();
+    
     // Use enhanced auth state management with persistence
     const { state, saveCreds } = await getAuthState();
     const { version } = await fetchLatestBaileysVersion();
@@ -1120,9 +1349,35 @@ async function startBot() {
     // Enhanced credentials saving with backup
     const originalSaveCreds = saveCreds;
     const enhancedSaveCreds = async () => {
-        await originalSaveCreds();
-        // Backup auth data for persistence across deployments
-        backupAuthToEnv({ creds: state.creds, keys: state.keys });
+        try {
+            // Save credentials normally first
+            await originalSaveCreds();
+            console.log('💾 Auth credentials saved to local files');
+            
+            // Then backup for persistence across deployments
+            setTimeout(() => {
+                try {
+                    backupAuthToEnv({ 
+                        creds: state.creds, 
+                        keys: state.keys 
+                    });
+                } catch (backupError) {
+                    console.error('❌ Failed to backup auth data:', backupError.message);
+                }
+            }, 1000); // Small delay to ensure files are written
+            
+        } catch (saveError) {
+            console.error('❌ Failed to save credentials:', saveError.message);
+            // Still try to backup what we have
+            try {
+                backupAuthToEnv({ 
+                    creds: state.creds, 
+                    keys: state.keys 
+                });
+            } catch (backupError) {
+                console.error('❌ Failed to backup auth data after save error:', backupError.message);
+            }
+        }
     };
 
     // QR handling with persistence awareness
@@ -1170,13 +1425,27 @@ async function startBot() {
             connectionStatus = 'connected';
             currentQRCode = null;
             
-            // Backup authentication data on successful connection
-            try {
-                backupAuthToEnv({ creds: state.creds, keys: state.keys });
-                console.log('💾 Authentication data backed up for persistence');
-            } catch (error) {
-                console.error('❌ Failed to backup auth data:', error);
-            }
+            // Backup authentication data on successful connection with retry
+            setTimeout(async () => {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        backupAuthToEnv({ 
+                            creds: state.creds, 
+                            keys: state.keys 
+                        });
+                        console.log(`💾 Authentication data backed up successfully (attempt ${attempt}/3)`);
+                        break; // Success, exit retry loop
+                    } catch (error) {
+                        console.error(`❌ Failed to backup auth data (attempt ${attempt}/3):`, error.message);
+                        if (attempt < 3) {
+                            console.log(`🔄 Retrying backup in ${attempt * 2} seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+                        } else {
+                            console.error('❌ All backup attempts failed. Auth data may not persist across deployments.');
+                        }
+                    }
+                }
+            }, 2000); // Wait 2 seconds for connection to stabilize
         } else if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQRCode = null;
@@ -1346,6 +1615,7 @@ You have full access to all bot features and controls.
 
 🔍  *Information Commands*
 • \`.status\` — Debug & system information
+• \`.backuptest\` — Test auth backup system
 
 🎨  *Media Commands*
 • \`.sticker\` — Convert image/GIF to sticker
@@ -1470,6 +1740,61 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
 `;
                         const targetJid = getSelfChatTargetJid(senderJid, from);
                         await sock.sendMessage(targetJid, { text: statusText }, { quoted: msg });
+                        break;
+                    }
+                    case '.backuptest': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.backuptest');
+                            break;
+                        }
+                        
+                        const targetJid = getSelfChatTargetJid(senderJid, from);
+                        
+                        try {
+                            // Run backup verification
+                            const hasValidBackup = verifyBackupIntegrity();
+                            
+                            // Create a test backup to verify the system is working
+                            console.log('🧪 Creating test backup...');
+                            backupAuthToEnv({ 
+                                creds: state.creds, 
+                                keys: state.keys 
+                            });
+                            
+                            // Check again after backup
+                            const hasValidBackupAfter = verifyBackupIntegrity();
+                            
+                            const statusText = `
+🔍 *Auth Backup System Test*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *Test Results:*
+• 🔍 Before Test: ${hasValidBackup ? '✅ Valid backup found' : '❌ No valid backup'}
+• 🧪 Test Backup: ✅ Attempted
+• 🔍 After Test: ${hasValidBackupAfter ? '✅ Valid backup found' : '❌ No valid backup'}
+
+🗂️ *Backup Locations Checked:*
+• /tmp/auth-backup
+• ./auth-backup  
+• ~/.wa-bot-backup (if available)
+
+📝 *Auth State Info:*
+• 🔑 Has Creds: ${state.creds ? '✅ Yes' : '❌ No'}
+• 🗝️ Has Keys: ${state.keys && Object.keys(state.keys).length > 0 ? `✅ Yes (${Object.keys(state.keys).length})` : '❌ No'}
+
+${hasValidBackupAfter ? '🎉 *Backup system is working!*' : '⚠️ *Backup system may have issues*'}
+
+💡 *Note:* Check console logs for detailed backup information.
+`;
+                            
+                            await sock.sendMessage(targetJid, { text: statusText }, { quoted: msg });
+                            
+                        } catch (error) {
+                            console.error('❌ Backup test failed:', error);
+                            await sock.sendMessage(targetJid, { 
+                                text: `❌ *Backup Test Failed*\n\nError: ${error.message}\n\nCheck console logs for more details.` 
+                            }, { quoted: msg });
+                        }
                         break;
                     }
                     case '.autoread': {
