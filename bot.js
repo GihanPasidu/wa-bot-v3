@@ -60,21 +60,32 @@ function backupAuthToEnv(authState) {
         if (authState.creds || authState.keys) {
             console.log('🔐 Backing up authentication credentials...');
             
-            // Multiple backup locations for better persistence
+            // Render-optimized backup locations with fallbacks
             const backupLocations = [
-                '/tmp/auth-backup',      // Primary location
-                './auth-backup',         // Secondary location
+                '/opt/render/project/src/auth-backup',  // Render persistent storage
+                './auth-backup',                         // Local backup
+                '/tmp/auth-backup',                      // Temporary storage
                 process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
             ].filter(Boolean);
             
             let backupSuccess = false;
+            let lastError = '';
             
             for (const authBackupDir of backupLocations) {
                 try {
-                    // Ensure backup directory exists
+                    console.log(`📁 Attempting backup to: ${authBackupDir}`);
+                    
+                    // Ensure backup directory exists with proper permissions
                     if (!fs.existsSync(authBackupDir)) {
-                        fs.mkdirSync(authBackupDir, { recursive: true });
+                        fs.mkdirSync(authBackupDir, { recursive: true, mode: 0o755 });
+                        console.log(`📁 Created backup directory: ${authBackupDir}`);
                     }
+                    
+                    // Test write permissions
+                    const testFile = path.join(authBackupDir, '.write-test');
+                    fs.writeFileSync(testFile, 'test');
+                    fs.unlinkSync(testFile);
+                    console.log(`✅ Write permissions verified for: ${authBackupDir}`);
                     
                     // Create comprehensive backup object
                     const backupData = {
@@ -119,16 +130,46 @@ function backupAuthToEnv(authState) {
                     
                     backupSuccess = true;
                     console.log(`✅ Authentication data backed up to: ${authBackupDir}`);
+                    
+                    // Also backup to environment variables as secondary method
+                    try {
+                        if (authState.creds) {
+                            process.env.BAILEYS_CREDS_BACKUP = Buffer.from(JSON.stringify(authState.creds)).toString('base64');
+                        }
+                        if (authState.keys && Object.keys(authState.keys).length > 0) {
+                            process.env.BAILEYS_KEYS_BACKUP = Buffer.from(JSON.stringify(authState.keys)).toString('base64');
+                        }
+                        process.env.BAILEYS_BACKUP_TIMESTAMP = Date.now().toString();
+                        console.log(`🔄 Also backed up to environment variables as fallback`);
+                    } catch (envError) {
+                        console.warn(`⚠️ Failed to backup to environment variables: ${envError.message}`);
+                    }
+                    
                     break; // Success, no need to try other locations
                     
                 } catch (dirError) {
-                    console.warn(`⚠️ Failed to backup to ${authBackupDir}:`, dirError.message);
+                    lastError = dirError.message;
+                    console.warn(`⚠️ Failed to backup to ${authBackupDir}: ${dirError.message}`);
                     continue; // Try next location
                 }
             }
             
             if (!backupSuccess) {
-                throw new Error('All backup locations failed');
+                console.error(`❌ All file backup locations failed. Last error: ${lastError}`);
+                
+                // Final fallback: environment variables only
+                try {
+                    if (authState.creds) {
+                        process.env.BAILEYS_CREDS_BACKUP = Buffer.from(JSON.stringify(authState.creds)).toString('base64');
+                    }
+                    if (authState.keys && Object.keys(authState.keys).length > 0) {
+                        process.env.BAILEYS_KEYS_BACKUP = Buffer.from(JSON.stringify(authState.keys)).toString('base64');
+                    }
+                    process.env.BAILEYS_BACKUP_TIMESTAMP = Date.now().toString();
+                    console.log(`🔄 Used environment variables as final backup method`);
+                } catch (envError) {
+                    throw new Error(`All backup methods failed: Files: ${lastError}, Env: ${envError.message}`);
+                }
             }
             
         } else {
@@ -141,11 +182,12 @@ function backupAuthToEnv(authState) {
 
 function restoreAuthFromBackup() {
     try {
-        // Check multiple backup locations
+        // Check multiple backup locations (Render-optimized)
         const backupLocations = [
-            '/tmp/auth-backup',
-            './auth-backup',
-            process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null
+            '/opt/render/project/src/auth-backup',  // Render persistent storage
+            './auth-backup',                         // Local backup
+            '/tmp/auth-backup',                      // Temporary storage
+            process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
         ].filter(Boolean);
         
         for (const authBackupDir of backupLocations) {
@@ -229,6 +271,45 @@ function restoreAuthFromBackup() {
                 console.warn(`⚠️ Error checking backup in ${authBackupDir}:`, dirError.message);
                 continue;
             }
+        }
+        
+        // Fallback: Check environment variables
+        console.log('🔍 Checking environment variable backups...');
+        try {
+            const credsBackup = process.env.BAILEYS_CREDS_BACKUP;
+            const keysBackup = process.env.BAILEYS_KEYS_BACKUP;
+            const backupTimestamp = process.env.BAILEYS_BACKUP_TIMESTAMP;
+            
+            if (credsBackup && backupTimestamp) {
+                const backupAge = Date.now() - parseInt(backupTimestamp);
+                const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+                
+                if (backupAge < maxAge) {
+                    console.log(`🔄 Found environment variable backup (age: ${Math.round(backupAge / (1000 * 60 * 60))} hours)`);
+                    
+                    const creds = JSON.parse(Buffer.from(credsBackup, 'base64').toString());
+                    let keys = {};
+                    
+                    if (keysBackup) {
+                        keys = JSON.parse(Buffer.from(keysBackup, 'base64').toString());
+                    }
+                    
+                    return {
+                        creds: creds,
+                        keys: keys,
+                        isRestored: true,
+                        backupLocation: 'environment-variables',
+                        backupAge: backupAge
+                    };
+                } else {
+                    console.log(`⏰ Environment backup is too old (${Math.round(backupAge / (1000 * 60 * 60 * 24))} days), clearing...`);
+                    delete process.env.BAILEYS_CREDS_BACKUP;
+                    delete process.env.BAILEYS_KEYS_BACKUP;
+                    delete process.env.BAILEYS_BACKUP_TIMESTAMP;
+                }
+            }
+        } catch (envError) {
+            console.warn(`⚠️ Error checking environment variable backup: ${envError.message}`);
         }
         
         console.log('📝 No valid auth backup found in any location');
@@ -324,9 +405,10 @@ function verifyBackupIntegrity() {
     console.log('🔍 Verifying backup integrity...');
     
     const backupLocations = [
-        '/tmp/auth-backup',
-        './auth-backup',
-        process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null
+        '/opt/render/project/src/auth-backup',  // Render persistent storage
+        './auth-backup',                         // Local backup
+        '/tmp/auth-backup',                      // Temporary storage
+        process.env.HOME ? `${process.env.HOME}/.wa-bot-backup` : null // Home directory
     ].filter(Boolean);
     
     let foundBackups = 0;
@@ -369,6 +451,30 @@ function verifyBackupIntegrity() {
         } catch (error) {
             console.log(`📁 ${location}: Error - ${error.message}`);
         }
+    }
+    
+    // Check environment variable backups
+    try {
+        const credsBackup = process.env.BAILEYS_CREDS_BACKUP;
+        const backupTimestamp = process.env.BAILEYS_BACKUP_TIMESTAMP;
+        
+        if (credsBackup && backupTimestamp) {
+            const backupAge = Date.now() - parseInt(backupTimestamp);
+            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+            
+            if (backupAge < maxAge) {
+                foundBackups++;
+                const ageHours = Math.round(backupAge / (1000 * 60 * 60));
+                console.log(`📁 Environment Variables: ✅ Valid (${ageHours}h old)`);
+            } else {
+                const ageDays = Math.round(backupAge / (1000 * 60 * 60 * 24));
+                console.log(`📁 Environment Variables: ⏰ Expired (${ageDays}d old)`);
+            }
+        } else {
+            console.log(`📁 Environment Variables: ❌ Not found`);
+        }
+    } catch (envError) {
+        console.log(`📁 Environment Variables: Error - ${envError.message}`);
     }
     
     console.log(`📊 Backup Summary: ${foundBackups} valid backup(s) found`);
@@ -1751,6 +1857,17 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         const targetJid = getSelfChatTargetJid(senderJid, from);
                         
                         try {
+                            // Get current environment info
+                            const envInfo = {
+                                platform: process.platform,
+                                arch: process.arch,
+                                nodeVersion: process.version,
+                                cwd: process.cwd(),
+                                home: process.env.HOME || 'undefined',
+                                user: process.env.USER || process.env.USERNAME || 'undefined',
+                                render: process.env.RENDER ? 'Yes' : 'No'
+                            };
+                            
                             // Run backup verification
                             const hasValidBackup = verifyBackupIntegrity();
                             
@@ -1764,9 +1881,24 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             // Check again after backup
                             const hasValidBackupAfter = verifyBackupIntegrity();
                             
+                            // Check environment variable backup status
+                            const envBackupStatus = {
+                                hasCreds: !!process.env.BAILEYS_CREDS_BACKUP,
+                                hasKeys: !!process.env.BAILEYS_KEYS_BACKUP,
+                                hasTimestamp: !!process.env.BAILEYS_BACKUP_TIMESTAMP
+                            };
+                            
                             const statusText = `
 🔍 *Auth Backup System Test*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🖥️ *Environment Info:*
+• Platform: ${envInfo.platform}
+• Architecture: ${envInfo.arch}
+• Node.js: ${envInfo.nodeVersion}
+• Working Dir: ${envInfo.cwd}
+• Home Dir: ${envInfo.home}
+• Render Deploy: ${envInfo.render}
 
 📊 *Test Results:*
 • 🔍 Before Test: ${hasValidBackup ? '✅ Valid backup found' : '❌ No valid backup'}
@@ -1774,9 +1906,15 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
 • 🔍 After Test: ${hasValidBackupAfter ? '✅ Valid backup found' : '❌ No valid backup'}
 
 🗂️ *Backup Locations Checked:*
-• /tmp/auth-backup
-• ./auth-backup  
-• ~/.wa-bot-backup (if available)
+• /opt/render/project/src/auth-backup (Render persistent)
+• ./auth-backup (Local)
+• /tmp/auth-backup (Temporary)
+• ~/.wa-bot-backup (Home directory)
+
+🌐 *Environment Variable Backup:*
+• Creds: ${envBackupStatus.hasCreds ? '✅ Present' : '❌ Missing'}
+• Keys: ${envBackupStatus.hasKeys ? '✅ Present' : '❌ Missing'}
+• Timestamp: ${envBackupStatus.hasTimestamp ? '✅ Present' : '❌ Missing'}
 
 📝 *Auth State Info:*
 • 🔑 Has Creds: ${state.creds ? '✅ Yes' : '❌ No'}

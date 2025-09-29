@@ -13,5 +13,12 @@ services:
         value: 10000
       - key: RENDER_EXTERNAL_URL
         value: https://wa-bot-v3-5f7s.onrender.com
+      # Auth backup environment variables (managed by bot)
+      - key: BAILEYS_CREDS_BACKUP
+        sync: false
+      - key: BAILEYS_KEYS_BACKUP
+        sync: false
+      - key: BAILEYS_BACKUP_TIMESTAMP
+        sync: false
     autoDeploy: true
     healthCheckPath: /health
