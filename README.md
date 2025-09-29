@@ -29,11 +29,13 @@
 - 📞 **Anti-Call** — Block unwanted voice/video calls
 - ⚡ **Toggle Bot** — Enable/disable bot functionality instantly
 
-### 🎨 **Media Processing**
-- 🏷️ **Sticker Creator** — Convert images to WhatsApp stickers
-- 🖼️ **Image Converter** — Transform stickers back to images
-- 📱 **Quote Support** — Works with quoted messages and direct media
-- 🎭 **High Quality** — Professional media processing with Sharp
+### 🎨 **Advanced Media Processing**
+- 🏷️ **Smart Sticker Creator** — Convert images and MP4 videos to WhatsApp stickers
+- 🎬 **Animated Sticker Support** — Full MP4 to animated WebP conversion with size optimization
+- 🖼️ **Image Converter** — Transform stickers back to images with high quality
+- 📱 **Quote Support** — Works with quoted messages and direct media uploads
+- 🎭 **Professional Quality** — Hybrid FFmpeg + Sharp pipeline for optimal results
+- 📏 **Size Optimization** — Intelligent compression ensuring 500KB WhatsApp compliance
 
 ### 🛠️ **Advanced Utilities**
 - 🔗 **URL Shortener** — Powered by TinyURL API integration
@@ -41,10 +43,12 @@
 - ⏰ **Time & Uptime** — Current time, timezone, and bot statistics
 - 🔐 **Password Generator** — Cryptographically secure passwords
 
-### 👥 **Group Management** *(Admin Only)*
-- ℹ️ **Group Info** — Detailed group analytics and information
+### 👥 **Group Commands** *(Available to All Members)*
+- ℹ️ **Group Info** — View group information and statistics
 - 📢 **Tag All** — Mention all group members with custom message
-- 👑 **Admin Tools** — List administrators and manage permissions
+- 👑 **Admin List** — View group administrators and permissions
+
+### 🛠️ **Group Management** *(Admin Only)*
 - 📊 **Member Stats** — Comprehensive member analytics
 - 📜 **Group Rules** — Display and manage group guidelines
 - 🚫 **Member Control** — Kick, promote, and manage members
@@ -153,245 +157,116 @@
 ### 🎛️ **Bot Management** *(Bot Admin Only)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.panel` | 📋 Show admin control panel | `.panel` |
-| `.autoread` | 📖 Toggle auto-read | `.autoread` |
-| `.anticall` | 📞 Toggle call blocking | `.anticall` |
-| `.on` / `.off` | ⚡ Enable/disable bot | `.on` or `.off` |
+| `.panel` | Admin control dashboard | `.panel` |
+| `.toggle autoread` | Toggle auto-read messages | `.toggle autoread` |
+| `.toggle anticall` | Toggle call blocking | `.toggle anticall` |
+| `.toggle bot` | Enable/disable bot | `.toggle bot` |
 
-### 🔍 **Information Commands** *(Available to All)*
+### 🎨 **Media Processing** *(All Users)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.status` | 🔍 View debug status | `.status` |
-| `.help` | 📚 Role-based help guide | `.help` |
-| `.panel` | 📋 User menu (for non-admins) | `.panel` |
+| `.sticker` | Convert image to sticker | Send/quote image + `.sticker` |
+| `.toimg` | Convert sticker to image | Send/quote sticker + `.toimg` |
 
-### 🎨 **Media Commands**
+### 🛠️ **Utilities** *(All Users)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.sticker` | 🏷️ Create sticker | `.sticker` (with image) |
-| `.toimg` | 🖼️ Convert to image | `.toimg` (reply to sticker) |
+| `.short <url>` | Shorten URL | `.short https://example.com` |
+| `.color <color>` | Get color codes | `.color red` or `.color #ff0000` |
+| `.time` | Current time & uptime | `.time` |
+| `.pass <length>` | Generate password | `.pass 12` |
 
-### 🛠️ **Utility Commands**
+### 👥 **Group Information** *(All Group Members)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.shorturl` | 🔗 Shorten URL | `.shorturl https://example.com` |
-| `.color` | 🌈 Color lookup | `.color red` |
-| `.time` | ⏰ Current time | `.time` |
-| `.pass` | 🔐 Generate password | `.pass 16` |
+| `.ginfo` | Group information & stats | `.ginfo` |
+| `.tagall [message]` | Tag all members | `.tagall Good morning!` |
+| `.admins` | List group administrators | `.admins` |
 
-### 👥 **Group Commands** *(Admin Only)*
+### 🛡️ **Group Management** *(Group Admin Only)*
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `.ginfo` | ℹ️ Group information | `.ginfo` |
-| `.tagall` | 📢 Tag all members | `.tagall Meeting now!` |
-| `.admins` | 👑 List admins | `.admins` |
-| `.kick` | 🚫 Remove member | `.kick @user` |
-| `.promote` | ⬆️ Promote to admin | `.promote @user` |
-| `.mute` | 🔇 Mute group | `.mute 1h` |
-| `.muteuser` | 🔇 Mute individual | `.muteuser @user 30m spam` |
-| `.warn` | ⚠️ Warn member | `.warn @user` |
-| `.antilink` | 🔗 Toggle link protection | `.antilink on` |
+| `.members` | Member statistics | `.members` |
+| `.rules` | Display/manage rules | `.rules` |
+| `.kick @user` | Remove member | `.kick @username` |
+| `.promote @user` | Make admin | `.promote @username` |
+| `.demote @user` | Remove admin | `.demote @username` |
+| `.mute <duration>` | Mute group | `.mute 1h` |
+| `.unmute` | Unmute group | `.unmute` |
+| `.warn @user` | Issue warning | `.warn @username` |
+| `.antilink on/off` | Toggle link protection | `.antilink on` |
+
+### 📋 **Help Commands** *(All Users)*
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `.help` | Main help menu | `.help` |
+| `.ghelp` | Group commands help | `.ghelp` |
 
 ---
 
-## 🔧 Technical Stack
+## 🔐 Permission System
 
-### **🏗️ Core Technologies**
-- **[@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys)** — WhatsApp Web API
-- **[axios](https://axios-http.com/)** — HTTP client for API requests
-- **[sharp](https://sharp.pixelplumbing.com/)** — High-performance image processing
-- **[pino](https://getpino.io/)** — Lightning-fast logging framework
-- **[qrcode](https://www.npmjs.com/package/qrcode)** — QR code generation
+### 👑 **Bot Administrators**
+- Full access to all commands
+- Bot management and configuration
+- Advanced debugging information
+- Admin-specific error messages
 
-### **🌟 Key Features**
-- 🔄 **Auto-Recovery** — Automatic reconnection handling
-- 💾 **Persistent Auth** — Authentication survives deployments
-- 🛡️ **Security First** — Admin validation and secure auth handling
-- 📱 **Mobile Responsive** — Web QR interface works on all devices
-- ⚡ **High Performance** — Optimized for production environments
+### 🛡️ **Group Administrators** 
+- Group management commands
+- Member moderation tools
+- Mute and warning systems
+- Anti-link protection controls
 
----
-
-## 🌍 Production Features
-
-### **🔍 Monitoring & Health**
-- 🩺 **Health Checks** — `/health` endpoint for monitoring
-- 📊 **Status Dashboard** — Real-time bot status at web interface
-- 🔄 **Auto-Recovery** — Automatic reconnection on disconnection
-- 💓 **Keep-Alive** — Prevents service sleeping on free tiers
-
-#### **⏰ External Health Monitoring with Cron-Job.org**
-
-For enhanced reliability and automated monitoring, set up external health checks using **[cron-job.org](https://cron-job.org)**:
-
-**🚀 Quick Setup Steps:**
-
-1. **📝 Create Account**
-   - Visit [cron-job.org](https://cron-job.org)
-   - Sign up for a free account
-
-2. **➕ Add New Cron Job**
-   ```
-   Title: CloudNextra Bot Health Check
-   URL: https://your-app-name.onrender.com/health
-   Schedule: */5 * * * * (Every 5 minutes)
-   Request Method: GET
-   Expected HTTP Status: 200
-   ```
-
-3. **🔔 Configure Notifications**
-   ```
-   Email Notifications: ✅ Enable
-   Failure Notifications: ✅ Send on failure
-   Success Notifications: ❌ Disable (optional)
-   Notification Email: your-email@domain.com
-   ```
-
-4. **⚙️ Advanced Settings**
-   ```
-   Timeout: 30 seconds
-   Retries: 3 attempts
-   User-Agent: CloudNextra-HealthMonitor/1.0
-   Follow Redirects: ✅ Yes
-   ```
-
-**📊 Expected Health Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "uptime": "2d 4h 30m",
-  "whatsapp_status": "connected",
-  "version": "3.0.0"
-}
-```
-
-**🎯 Benefits:**
-- ✅ **24/7 Monitoring** — Continuous health surveillance
-- ✅ **Instant Alerts** — Email notifications on failures
-- ✅ **Keep Services Active** — Prevents Render free tier sleeping
-- ✅ **Performance Tracking** — Monitor response times and uptime
-- ✅ **Zero Cost** — Free monitoring service
-- ✅ **Global Monitoring** — Multiple server locations
-
-**🔧 Alternative Monitoring Services:**
-- **[UptimeRobot](https://uptimerobot.com/)** — 50 monitors free
-- **[StatusCake](https://www.statuscake.com/)** — Free tier available
-- **[Pingdom](https://www.pingdom.com/)** — Basic monitoring
-- **[Better Uptime](https://betteruptime.com/)** — Modern interface
-
-### **🔐 Security & Reliability**
-- 🛡️ **Admin Only Commands** — Secure permission validation
-- 🔒 **Auth Protection** — Sensitive data excluded from repository
-- 🔄 **Backup System** — Automatic auth data backup and restore
-- ⏰ **Session Management** — Intelligent session handling
-
-### **📈 Scalability**
-- 🚀 **Production Ready** — Optimized for cloud deployment
-- 📦 **Docker Support** — Containerized deployment option
-- 🔧 **Environment Config** — Flexible configuration management
-- 📊 **Performance Optimized** — Efficient resource utilization
+### 👤 **Regular Users**
+- Media processing tools
+- Basic utility commands
+- Group information access
+- User-friendly help system
 
 ---
 
-## 📁 Project Structure
+## 📝 Recent Updates
 
-```
-wa-bot-v3/
-├── 📄 bot.js                    # Main bot implementation
-├── 📦 package.json              # Dependencies and scripts
-├── 📚 README.md                 # This documentation
-├── 🔐 PERSISTENT-AUTH.md        # Authentication persistence guide
-├── 👥 USER-MUTE-FEATURE.md     # Individual user mute system
-├── ⚙️  .env.example             # Environment variables template
-├── 🐳 Dockerfile               # Docker containerization
-├── 🚀 render.yaml              # Render deployment config
-├── 🌐 public/
-│   └── qr.html                 # Professional QR interface
-└── 🔒 auth/                    # WhatsApp session data (auto-generated)
-    ├── creds.json
-    └── *.json                  # Session files
-```
+### 🆕 **Version 3.0.0** - *Latest*
+- 🎉 **Enhanced Group Permissions** — `.ginfo`, `.tagall`, and `.admins` commands now available to all group members
+- 🎬 **Advanced Media Support** — Full MP4 to animated WebP sticker conversion with size optimization
+- 🔧 **Improved Help System** — Role-based help documentation with clear permission indicators
+- �️ **Smart Role Detection** — Context-aware error messages and feature access
+- 📱 **Web QR Interface** — Beautiful web-based QR code scanning at deployment URL
+- � **Production Ready** — Enhanced Render deployment with persistent authentication
+- 🎨 **Media Processing** — Hybrid FFmpeg + Sharp pipeline for optimal sticker quality
+- � **File Size Optimization** — Intelligent compression with 500KB WhatsApp limit compliance
 
----
-
-## 💡 Usage Examples
-
-### **🎨 Media Commands**
-```bash
-# Convert image to sticker
-Send image with caption: .sticker
-# or reply to image: .sticker
-
-# Convert sticker to image  
-Reply to sticker: .toimg
-```
-
-### **🛠️ Advanced Tools**
-```bash
-.shorturl https://example.com/very/long/url/path
-.color red
-.time
-.pass 16
-```
-
-### **👥 Group Management**
-```bash
-.ginfo
-.tagall 📢 Important announcement!
-.kick @spammer
-.promote @trusted_user
-.warn @rule_breaker Please follow group rules
-.mute 1h
-.muteuser @troublemaker 30m spamming
-.antilink on
-```
+### 🔄 **Permission Changes**
+- ✅ **`.ginfo`** — Now accessible to all group members (was admin-only)
+- ✅ **`.tagall`** — Now accessible to all group members (was admin-only)
+- ✅ **`.admins`** — Remains accessible to all group members
+- 🔒 **Admin Commands** — Management features still require group admin privileges
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
-
-1. **🍴 Fork** the repository
-2. **🌿 Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **💾 Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **📤 Push** to branch (`git push origin feature/amazing-feature`)
-5. **🔃 Open** a Pull Request
-
----
+We welcome contributions! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+## � Acknowledgments
 
-## 🆘 Support
-
-### **📞 Get Help**
-- 🐛 **Issues**: [GitHub Issues](https://github.com/GihanPasidu/wa-bot-v3/issues)
-- 📖 **Documentation**: Check our comprehensive guides
-- 💬 **Community**: Join our discussions
-
-### **🔗 Quick Links**
-- 🌐 **Live Demo**: [CloudNextra Bot Demo](https://wa-bot-v3.onrender.com)
-
-### **🔧 Troubleshooting**
-- **Build Failures**: Check Node.js version compatibility (requires 20+)
-- **Memory Issues**: Consider upgrading to Render paid tier
-- **Connection Issues**: Verify WhatsApp authentication and QR scanning
-- **Command Errors**: Check admin JID configuration in bot.js
+- **Baileys** — Excellent WhatsApp Web API library
+- **Sharp** — High-performance image processing
+- **FFmpeg** — Video processing capabilities
+- **Render** — Reliable cloud hosting platform
 
 ---
 
 <div align="center">
 
-**⭐ Star this repository if you found it helpful!**
+**🌟 Star this repository if you find it helpful!**
 
-Made by [CloudNextra Solutions](https://github.com/GihanPasidu)
-
-![GitHub stars](https://img.shields.io/github/stars/GihanPasidu/wa-bot-v3?style=social)
-![GitHub forks](https://img.shields.io/github/forks/GihanPasidu/wa-bot-v3?style=social)
+Made with ❤️ by CloudNextra Solutions
 
 </div>

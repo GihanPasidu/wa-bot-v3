@@ -1870,10 +1870,12 @@ You have full access to all bot features and advanced controls.
 • \`.time\` — Current time with timezone info
 • \`.pass [length]\` — Cryptographically secure password generator
 
-👥 **Group Management** (Requires Group Admin)
-• \`.ginfo\` — Detailed group analytics
-• \`.tagall [message]\` — Mention all members
+👥 **Group Commands** (Available to All Members)
+• \`.ginfo\` — View group information and statistics
+• \`.tagall [message]\` — Mention all group members
 • \`.admins\` — List group administrators
+
+👥 **Group Management** (Requires Group Admin)
 • \`.members\` — Comprehensive member statistics
 • \`.rules\` — Display/manage group rules
 • \`.kick @user\` — Remove member from group
@@ -2172,14 +2174,10 @@ Here's everything you can do with this bot:
                         break;
                     }
                     
-                    // Group Management Commands (Admin Only)
+                    // Group Management Commands
                     case '.ginfo': {
                         if (!isGroup) {
                             await sendErrorMessage(sock, senderJid, from, 'GROUP_ONLY');
-                            break;
-                        }
-                        if (!isAdmin) {
-                            await sendErrorMessage(sock, senderJid, from, 'GROUP_ADMIN_REQUIRED');
                             break;
                         }
                         const groupInfo = await getGroupInfo(sock, from);
@@ -2260,7 +2258,7 @@ Try \`.ghelp\` for group commands.`;
 • \`.resetwarns\` — Reset all group warnings
 • \`.antilink on/off\` — Toggle anti-link protection
 
-ℹ️ *Note:* All commands require admin privileges except \`.rules\`, \`.admins\`, and \`.members\`.`;
+ℹ️ *Note:* All commands require admin privileges except \`.ginfo\`, \`.tagall\`, \`.admins\`, \`.rules\`, and \`.members\`.`;
                         await sock.sendMessage(from, { text: helpText }, { quoted: msg });
                         break;
                     }
@@ -2776,10 +2774,6 @@ Try \`.ghelp\` for group commands.`;
                     case '.tagall': {
                         if (!isGroup) {
                             await sock.sendMessage(from, { text: '❌ This command only works in groups.' }, { quoted: msg });
-                            break;
-                        }
-                        if (!isAdmin) {
-                            await sock.sendMessage(from, { text: '❌ Only group admins can use this command.' }, { quoted: msg });
                             break;
                         }
                         
