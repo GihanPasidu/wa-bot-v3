@@ -931,7 +931,6 @@
         @media print {
             .background-animation,
             .matrix-bg,
-            .notification-container,
             .action-buttons {
                 display: none !important;
             }
@@ -1359,65 +1358,6 @@
             color: #8250df;
         }
 
-        /* Advanced Notification System */
-        .notification-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 10000;
-            pointer-events: none;
-        }
-
-        .notification {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-lg);
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            box-shadow: var(--shadow-lg);
-            transform: translateX(400px);
-            transition: transform 0.3s ease-in-out;
-            pointer-events: all;
-            max-width: 350px;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        .notification-header {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .notification-icon {
-            font-size: 1.2rem;
-        }
-
-        .notification.success .notification-icon {
-            color: var(--success-green);
-        }
-
-        .notification.warning .notification-icon {
-            color: var(--warning-amber);
-        }
-
-        .notification.error .notification-icon {
-            color: var(--error-red);
-        }
-
-        .notification-title {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .notification-message {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
         /* Security Features Grid */
         .security-features-grid {
             display: grid;
@@ -1835,9 +1775,6 @@
         </div>
     </div>
 
-    <!-- Notification Container -->
-    <div class="notification-container" id="notification-container"></div>
-
     <!-- Matrix Background Effect -->
     <div class="matrix-bg" id="matrix-bg"></div>
 
@@ -2119,44 +2056,6 @@
                     }
                 }, 2000);
             }
-
-            showNotification(title, message, type = 'success') {
-                const container = document.getElementById('notification-container');
-                if (!container) return;
-
-                const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
-                
-                const icons = {
-                    success: 'fa-check-circle',
-                    warning: 'fa-exclamation-triangle',
-                    error: 'fa-times-circle',
-                    info: 'fa-info-circle'
-                };
-
-                notification.innerHTML = `
-                    <div class="notification-header">
-                        <i class="fas ${icons[type]} notification-icon"></i>
-                        <div class="notification-title">${title}</div>
-                    </div>
-                    <div class="notification-message">${message}</div>
-                `;
-
-                container.appendChild(notification);
-
-                // Show notification
-                setTimeout(() => {
-                    notification.classList.add('show');
-                }, 100);
-
-                // Auto-remove after 5 seconds
-                setTimeout(() => {
-                    notification.classList.remove('show');
-                    setTimeout(() => {
-                        notification.remove();
-                    }, 300);
-                }, 5000);
-            }
         }
 
         // Initialize advanced features
@@ -2245,13 +2144,8 @@
                     document.getElementById('refresh-btn').style.display = 'none';
                     document.querySelector('.refresh-timer').style.display = 'none';
                     
-                    // Show success animation and notification
+                    // Show success animation
                     showSuccessAnimation();
-                    techFeatures.showNotification(
-                        'Connection Successful!', 
-                        'CloudNextra Bot is now ready for operation', 
-                        'success'
-                    );
                     techFeatures.addTerminalLine('✓ WhatsApp connection established', 'success');
                     
                 } else if (data.status === 'disconnected') {
@@ -2285,24 +2179,14 @@
                     document.getElementById('uptime-value').textContent = data.uptime;
                 }
 
-                // Show QR scan notification for first-time users
+                // Log QR scan for first-time users
                 if (data.qr && !localStorage.getItem('qr_scanned_before')) {
-                    techFeatures.showNotification(
-                        'QR Code Ready', 
-                        'Scan the QR code with your WhatsApp to connect', 
-                        'info'
-                    );
                     techFeatures.addTerminalLine('→ QR code generated successfully', 'normal');
                 }
                 
             } catch (error) {
                 console.error('Error fetching QR code:', error);
                 handleConnectionError(error);
-                techFeatures.showNotification(
-                    'Connection Error', 
-                    'Failed to establish connection. Please try again.', 
-                    'error'
-                );
                 techFeatures.addTerminalLine(`✗ Connection failed: ${error.message}`, 'error');
             }
         }
@@ -2390,18 +2274,8 @@
                 refreshCount++;
                 qrStartTime = Date.now();
                 updateConnectionStats();
-                techFeatures.showNotification(
-                    'QR Code Refreshed', 
-                    'New QR code generated successfully', 
-                    'success'
-                );
             } catch (error) {
                 console.error('Refresh failed:', error);
-                techFeatures.showNotification(
-                    'Refresh Failed', 
-                    'Unable to refresh QR code. Please try again.', 
-                    'error'
-                );
             } finally {
                 setTimeout(() => {
                     button.disabled = false;
@@ -2526,15 +2400,6 @@
                         console.log('SW registration failed:', error);
                     });
             }
-            
-            // Show welcome notification
-            setTimeout(() => {
-                techFeatures.showNotification(
-                    'Welcome to CloudNextra Bot', 
-                    'Advanced WhatsApp automation platform is initializing...', 
-                    'info'
-                );
-            }, 1000);
         });
 
         // Enhanced status checking with performance monitoring
@@ -2559,11 +2424,7 @@
             if (e.key === 'ArrowUp') {
                 document.konamiSequence = (document.konamiSequence || '') + 'u';
                 if (document.konamiSequence.endsWith('uuddlrlrba')) {
-                    techFeatures.showNotification(
-                        'Developer Mode Activated', 
-                        'Advanced diagnostics enabled! 🚀', 
-                        'success'
-                    );
+                    console.log('Developer Mode Activated! 🚀');
                     document.konamiSequence = '';
                 }
             }
@@ -2578,11 +2439,6 @@
                 startCountdown();
                 fetchQRCode();
                 techFeatures.addTerminalLine('▶ Tab active - resuming updates', 'success');
-                techFeatures.showNotification(
-                    'Session Resumed', 
-                    'Real-time monitoring has been restored', 
-                    'info'
-                );
             }
         });
 
@@ -2595,14 +2451,6 @@
                     
                     if (techFeatures) {
                         techFeatures.addTerminalLine(`✓ Page loaded in ${loadTime.toFixed(0)}ms`, 'success');
-                        
-                        if (loadTime < 1000) {
-                            techFeatures.showNotification(
-                                'Optimal Performance', 
-                                `Page loaded in ${loadTime.toFixed(0)}ms - Excellent!`, 
-                                'success'
-                            );
-                        }
                     }
                 }, 100);
             });
@@ -2639,11 +2487,7 @@
                     document.body.classList.add('power-saving');
                     
                     if (techFeatures) {
-                        techFeatures.showNotification(
-                            'Power Saving Mode Enabled', 
-                            `Battery at ${level}% - Reduced animations to save power`, 
-                            'warning'
-                        );
+                        techFeatures.addTerminalLine('⚡ Power saving mode enabled', 'warning');
                     }
                 }
                 
