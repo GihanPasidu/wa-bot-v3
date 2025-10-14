@@ -1544,7 +1544,7 @@
                                 <i class="fas fa-lock"></i>
                                 <div>
                                     <div class="feature-title">End-to-End Encryption</div>
-                                    <div class="feature-desc">256-bit AES encryption</div>
+                                    <div class="feature-desc">Advanced encryption protocols</div>
                                 </div>
                             </div>
                             <div class="security-feature">
@@ -1618,10 +1618,6 @@
                         <div class="stat-card">
                             <div class="stat-value" id="status-value">Initializing</div>
                             <div class="stat-label">Status</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">256-bit</div>
-                            <div class="stat-label">Encryption</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">99.9%</div>
@@ -2330,7 +2326,7 @@
 
         // Update connection stats
         function updateConnectionStats() {
-            const uptimeElement = document.getElementById('qr-uptime');
+            const uptimeElement = document.getElementById('uptime-value');
             const refreshCountElement = document.getElementById('refresh-count');
             
             if (uptimeElement) {
@@ -2411,6 +2407,9 @@
             techFeatures = new AdvancedTechFeatures();
             fetchQRCode();
             startCountdown();
+            
+            // Initialize uptime display
+            updateConnectionStats();
             
             // Start connection stats updates
             setInterval(updateConnectionStats, 1000);

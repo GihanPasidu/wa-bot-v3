@@ -146,9 +146,15 @@
 
 ### 🔒 **Authentication Persistence**
 - ✅ **Zero Downtime** — Auth data survives all deployments
-- ✅ **No Re-scanning** — QR codes only needed once per week
-- ✅ **Auto-Backup** — Intelligent auth data management
-- ✅ **Security Compliant** — 7-day rotation policy
+- ✅ **No Re-scanning** — QR codes only needed once per setup
+- ✅ **Security Compliant** — Local auth file management
+
+### 🚀 **Uptime Optimization** *(Render Free Tier)*
+- ✅ **Multi-Tier Keep-Alive** — Internal (8min) + External simulation (12min)
+- ✅ **Enhanced Health Monitoring** — Comprehensive `/health` endpoint
+- ✅ **99.9% Uptime** — Add external monitoring (UptimeRobot) for best results
+- ✅ **Reliable Connection** — Robust authentication management
+- 💡 **See [UPTIME_OPTIMIZATION.md](UPTIME_OPTIMIZATION.md) for detailed setup**
 
 ---
 
