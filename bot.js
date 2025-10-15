@@ -48,41 +48,24 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
-// Enhanced auth state management
+// Enhanced auth state management (EPHEMERAL)
+// Returns an in-memory auth state and a no-op saveCreds to ensure no auth data
+// is written to disk. This forces a fresh QR scan after each restart/update.
 async function getAuthState() {
-    const authDir = './auth';
-    
-    // Ensure auth directory exists
-    if (!fs.existsSync(authDir)) {
-        fs.mkdirSync(authDir, { recursive: true });
-        console.log('📁 Created auth directory');
-    }
-    
-    try {
-        // Use existing auth files
-        const authState = await useMultiFileAuthState(authDir);
-        
-        // Check if we have valid credentials
-        if (authState.creds && Object.keys(authState.creds).length > 0) {
-            console.log('✅ Using existing authentication data from auth directory');
-        } else {
-            console.log('🆕 No existing auth found, will generate new QR code');
-        }
-        
-        return authState;
-        
-    } catch (error) {
-        console.error('❌ Error setting up auth state:', error.message);
-        console.log('🔄 Falling back to fresh auth state');
-        
-        // Fallback to fresh auth state
-        try {
-            return await useMultiFileAuthState(authDir);
-        } catch (fallbackError) {
-            console.error('❌ Critical error: Cannot create auth state:', fallbackError.message);
-            throw fallbackError;
-        }
-    }
+    // In-memory auth structure compatible with Baileys minimal expectations
+    const authState = {
+        creds: {},
+        // keys may be used by some Baileys internals; keep as Map for safety
+        keys: new Map()
+    };
+
+    const saveCreds = async () => {
+        // Intentionally do not persist credentials. No-op.
+        return;
+    };
+
+    console.log('⚠️ Running with EPHEMERAL in-memory auth state. Credentials will NOT be saved to disk.');
+    return { state: authState, saveCreds };
 }
 
 // Warning system functions
@@ -972,17 +955,11 @@ async function startBot() {
         browser: ['CloudNextra Bot', 'Desktop', '3.0.0']
     });
 
-    // Enhanced credentials saving
-    const originalSaveCreds = saveCreds;
+    // Credentials saving is intentionally a no-op to prevent persistence.
+    // When running with EPHEMERAL auth, do not persist credentials or write any files.
     const enhancedSaveCreds = async () => {
-        try {
-            // Save credentials normally first
-            await originalSaveCreds();
-            console.log('💾 Auth credentials saved to local files');
-            
-        } catch (saveError) {
-            console.error('❌ Failed to save credentials:', saveError.message);
-        }
+        // no-op: intentionally do not call saveCreds to avoid any persistence
+        return;
     };
 
     // QR handling with persistence awareness
