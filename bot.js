@@ -2956,7 +2956,7 @@ let lastSuccessfulPing = Date.now();
 if (process.env.NODE_ENV === 'production') {
     const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     
-    // Internal self-ping: every 5 minutes (more aggressive to prevent sleep)
+    // Internal self-ping: every 8 minutes (more conservative for stability)
     selfPingInterval = setInterval(async () => {
         try {
             const response = await axios.get(`${SELF_PING_URL}/health`, {
@@ -2980,9 +2980,9 @@ if (process.env.NODE_ENV === 'production') {
                 console.log(`❌ Both internal ping attempts failed - ${new Date().toISOString()}`);
             }
         }
-    }, 5 * 60 * 1000); // Every 5 minutes for better reliability
+    }, 8 * 60 * 1000); // Every 8 minutes for reliability
     
-    // External ping simulation: every 8 minutes (mimics external monitoring)
+    // External ping simulation: every 12 minutes (mimics external monitoring)
     externalPingInterval = setInterval(async () => {
         try {
             const response = await axios.get(`${SELF_PING_URL}/health`, {
@@ -2993,14 +2993,14 @@ if (process.env.NODE_ENV === 'production') {
                     'X-Ping-Type': 'external-simulation'
                 }
             });
-            console.log(`🌐 External monitor simulation: ${response.status} - ${new Date().toISOString()}`);
+            console.log(`� External monitor simulation: ${response.status} - ${new Date().toISOString()}`);
         } catch (error) {
             console.log(`⚠️ External monitor simulation failed: ${error.message} - ${new Date().toISOString()}`);
         }
-    }, 8 * 60 * 1000); // Every 8 minutes
+    }, 12 * 60 * 1000); // Every 12 minutes
     
     console.log('🏓 Enhanced multi-tier keep-alive system activated');
-    console.log('📊 Internal pings: every 5 minutes | External simulation: every 8 minutes');
+    console.log('📊 Internal pings: every 8 minutes | External simulation: every 12 minutes');
     console.log('💡 Consider adding external monitoring (UptimeRobot) for 99.9% uptime');
 }
 
