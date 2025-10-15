@@ -48,24 +48,9 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 // Auto-unmute timer
 let unmuteTimer = null;
 
-// Enhanced auth state management (EPHEMERAL)
-// Returns an in-memory auth state and a no-op saveCreds to ensure no auth data
-// is written to disk. This forces a fresh QR scan after each restart/update.
+// Enhanced auth state management
 async function getAuthState() {
-    // In-memory auth structure compatible with Baileys minimal expectations
-    const authState = {
-        creds: {},
-        // keys may be used by some Baileys internals; keep as Map for safety
-        keys: new Map()
-    };
-
-    const saveCreds = async () => {
-        // Intentionally do not persist credentials. No-op.
-        return;
-    };
-
-    console.log('⚠️ Running with EPHEMERAL in-memory auth state. Credentials will NOT be saved to disk.');
-    return { state: authState, saveCreds };
+    return await useMultiFileAuthState('./auth');
 }
 
 // Warning system functions
@@ -955,12 +940,8 @@ async function startBot() {
         browser: ['CloudNextra Bot', 'Desktop', '3.0.0']
     });
 
-    // Credentials saving is intentionally a no-op to prevent persistence.
-    // When running with EPHEMERAL auth, do not persist credentials or write any files.
-    const enhancedSaveCreds = async () => {
-        // no-op: intentionally do not call saveCreds to avoid any persistence
-        return;
-    };
+    // Save credentials properly
+    sock.ev.on('creds.update', saveCreds);
 
     // QR handling with persistence awareness
     sock.ev.on('connection.update', async (update) => {
@@ -1014,8 +995,6 @@ async function startBot() {
             if (shouldReconnect) startBot();
         }
     });
-
-    sock.ev.on('creds.update', enhancedSaveCreds);
 
     // Start auto-unmute timer (check every 30 seconds)
     unmuteTimer = setInterval(async () => {
