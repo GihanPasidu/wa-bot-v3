@@ -13,5 +13,14 @@ services:
         value: 10000
       - key: RENDER_EXTERNAL_URL
         value: https://wa-bot-v3.onrender.com
+      # Enhanced keep-alive configuration
+      - key: KEEP_ALIVE_AGGRESSIVE
+        value: true
+      - key: KEEP_ALIVE_INTERVAL
+        value: 120000
     autoDeploy: true
     healthCheckPath: /health
+    # Enhanced resource allocation for better stability
+    disk: 512MB
+    # Restart policy for better reliability
+    restartPolicy: always

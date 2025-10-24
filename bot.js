@@ -2904,10 +2904,19 @@ server.listen(PORT, () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 });
 
-// Self-ping mechanism to keep the service active on Render
+// Enhanced Self-ping mechanism with aggressive keep-alive for Render FREE TIER
 let selfPingInterval = null;
 let externalPingInterval = null;
+let aggressivePingInterval = null;
 let lastSuccessfulPing = Date.now();
+let consecutiveFailures = 0;
+let pingStats = {
+    totalPings: 0,
+    successfulPings: 0,
+    failedPings: 0,
+    lastFailure: null,
+    lastSuccess: Date.now()
+};
 
 if (process.env.NODE_ENV === 'production') {
     const SELF_PING_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
@@ -2936,7 +2945,7 @@ if (process.env.NODE_ENV === 'production') {
                 console.log(`❌ Both internal ping attempts failed - ${new Date().toISOString()}`);
             }
         }
-    }, 5 * 60 * 1000); // Every 5 minutes (more aggressive for free tier)
+    }, 2 * 60 * 1000); // Every 2 minutes (ultra-aggressive for free tier)
     
     // External ping simulation: every 12 minutes (mimics external monitoring)
     externalPingInterval = setInterval(async () => {
@@ -2953,11 +2962,12 @@ if (process.env.NODE_ENV === 'production') {
         } catch (error) {
             console.log(`⚠️ External monitor simulation failed: ${error.message} - ${new Date().toISOString()}`);
         }
-    }, 8 * 60 * 1000); // Every 8 minutes (more aggressive for free tier)
+    }, 3 * 60 * 1000); // Every 3 minutes (aggressive external simulation)
     
-    console.log('🏓 Enhanced multi-tier keep-alive system activated for Render FREE TIER');
-    console.log('📊 Internal pings: every 5 minutes | External simulation: every 8 minutes');
-    console.log('💡 Consider adding external monitoring (UptimeRobot) for 99.9% uptime');
+    console.log('🔥 ULTRA-AGGRESSIVE KEEP-ALIVE SYSTEM FOR RENDER FREE TIER');
+    console.log('⚡ Internal pings: every 2min | External simulation: every 3min');
+    console.log('� CRITICAL: This prevents 15min timeout with multiple redundant pings');
+    console.log('💡 External monitoring (UptimeRobot) still recommended for 99.9% uptime');
 }
 
 startBot().catch((e) => {
@@ -2979,6 +2989,10 @@ process.on('SIGINT', () => {
         clearInterval(externalPingInterval);
         console.log('🌐 External ping simulation stopped');
     }
+    if (aggressivePingInterval) {
+        clearInterval(aggressivePingInterval);
+        console.log('🔥 Aggressive ping mechanism stopped');
+    }
     server.close(() => {
         console.log('🌐 Health check server closed');
         console.log('👋 Bot shutdown complete. Goodbye!');
@@ -2999,6 +3013,10 @@ process.on('SIGTERM', () => {
     if (externalPingInterval) {
         clearInterval(externalPingInterval);
         console.log('🌐 External ping simulation stopped');
+    }
+    if (aggressivePingInterval) {
+        clearInterval(aggressivePingInterval);
+        console.log('🔥 Aggressive ping mechanism stopped');
     }
     server.close(() => {
         console.log('🌐 Health check server closed');
