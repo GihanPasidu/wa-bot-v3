@@ -12,12 +12,16 @@ services:
       - key: PORT
         value: 10000
       - key: RENDER_EXTERNAL_URL
+<<<<<<< HEAD
         value: https://wa-bot-v3.onrender.com
       # Enhanced keep-alive configuration
       - key: KEEP_ALIVE_AGGRESSIVE
         value: true
       - key: KEEP_ALIVE_INTERVAL
         value: 120000
+=======
+        value: https://wa-bot-v3-5f7s.onrender.com
+>>>>>>> parent of f7564bc (update render link)
     autoDeploy: true
     healthCheckPath: /health
     # Enhanced resource allocation for better stability
