@@ -9,7 +9,7 @@ echo ""
 echo "📋 First, find your Render service URL:"
 echo "   1. Go to your Render Dashboard"
 echo "   2. Click on your wa-bot-v3 service"
-echo "   3. Copy the URL (e.g., https://wa-bot-v3-xxxx.onrender.com)"
+echo "   3. Copy the URL (e.g., https://wa-bot-v3.onrender.com)"
 echo ""
 
 read -p "Enter your Render service URL: " RENDER_URL

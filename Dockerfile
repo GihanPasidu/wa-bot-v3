@@ -1,4 +1,7 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
+
+# Update packages and install security updates
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -6,17 +9,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies with clean cache
+RUN npm ci --only=production && npm cache clean --force
 
 # Copy application files
 COPY . .
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S botuser -u 1001
+# Create non-root user with specific UID/GID
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S botuser -u 1001 -G nodejs
 
-# Change ownership
+# Change ownership and switch to non-root user
 RUN chown -R botuser:nodejs /app
 USER botuser
 

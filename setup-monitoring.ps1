@@ -6,7 +6,7 @@ Write-Host "=============================================="
 Write-Host ""
 
 # Your Render URL
-$RENDER_URL = "https://wa-bot-v3-5f7s.onrender.com"
+$RENDER_URL = "https://wa-bot-v3.onrender.com"
 
 Write-Host "📋 Using your Render service URL: $RENDER_URL" -ForegroundColor Cyan
 Write-Host ""

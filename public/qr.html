@@ -705,14 +705,6 @@
                 flex: unset;
             }
             
-            .security-features-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .connection-stats {
-                grid-template-columns: 1fr;
-            }
-            
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 0.75rem;
@@ -750,10 +742,6 @@
             
             .stats-grid {
                 grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .security-features-grid {
-                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -1144,109 +1132,6 @@
             50% { transform: scale(1.1); filter: drop-shadow(0 0 20px rgba(37, 211, 102, 0.6)); }
         }
 
-        /* Network Topology Visualization */
-        .network-topology {
-            position: relative;
-            height: 200px;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            margin: 1rem 0;
-            overflow: hidden;
-        }
-
-        .node {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: var(--whatsapp-green);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.7rem;
-            font-weight: 600;
-            box-shadow: 0 0 15px rgba(37, 211, 102, 0.5);
-            animation: node-pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes node-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-        }
-
-        .connection-line {
-            position: absolute;
-            background: var(--whatsapp-green);
-            opacity: 0.6;
-            animation: data-flow 3s ease-in-out infinite;
-        }
-
-        @keyframes data-flow {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 0.8; }
-        }
-
-        /* Terminal Output Simulation */
-        .terminal {
-            background: #0d1117;
-            color: #58a6ff;
-            font-family: 'JetBrains Mono', monospace;
-            padding: 1rem;
-            border-radius: var(--radius-lg);
-            margin: 1rem 0;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .terminal-header {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #30363d;
-        }
-
-        .terminal-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-
-        .terminal-dot.red { background: #ff5f56; }
-        .terminal-dot.yellow { background: #ffbd2e; }
-        .terminal-dot.green { background: #27ca3f; }
-
-        .terminal-line {
-            margin-bottom: 0.25rem;
-            opacity: 0;
-            animation: type-in 0.5s ease-in-out forwards;
-        }
-
-        @keyframes type-in {
-            to { opacity: 1; }
-        }
-
-        .terminal-prompt::before {
-            content: '$ ';
-            color: #7c3aed;
-        }
-
-        .terminal-success {
-            color: #3fb950;
-        }
-
-        .terminal-warning {
-            color: #d29922;
-        }
-
-        .terminal-error {
-            color: #f85149;
-        }
-
         /* Advanced Loading States */
         .skeleton-loader {
             background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
@@ -1358,48 +1243,7 @@
             color: #8250df;
         }
 
-        /* Security Features Grid */
-        .security-features-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
 
-        .security-feature {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            background: var(--bg-secondary);
-            padding: 1rem;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border-light);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .security-feature:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .security-feature i {
-            font-size: 1.2rem;
-            color: var(--whatsapp-green);
-            width: 20px;
-            text-align: center;
-        }
-
-        .feature-title {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .feature-desc {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-        }
 
         /* Connection Stats */
         .connection-stats {
@@ -1529,48 +1373,6 @@
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">seconds</div>
                     </div>
 
-                    <!-- Security Features Panel -->
-                    <div class="system-monitor" style="margin-top: 2rem;">
-                        <div class="monitor-header">
-                            <div class="monitor-title">
-                                <i class="fas fa-shield-alt"></i>
-                                Security Features
-                                <div class="status-indicator"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="security-features-grid">
-                            <div class="security-feature">
-                                <i class="fas fa-lock"></i>
-                                <div>
-                                    <div class="feature-title">End-to-End Encryption</div>
-                                    <div class="feature-desc">Advanced encryption protocols</div>
-                                </div>
-                            </div>
-                            <div class="security-feature">
-                                <i class="fas fa-user-shield"></i>
-                                <div>
-                                    <div class="feature-title">Privacy Protection</div>
-                                    <div class="feature-desc">No data stored locally</div>
-                                </div>
-                            </div>
-                            <div class="security-feature">
-                                <i class="fas fa-sync-alt"></i>
-                                <div>
-                                    <div class="feature-title">Auto-Refresh</div>
-                                    <div class="feature-desc">QR expires every 30s</div>
-                                </div>
-                            </div>
-                            <div class="security-feature">
-                                <i class="fas fa-mobile-alt"></i>
-                                <div>
-                                    <div class="feature-title">Multi-Device</div>
-                                    <div class="feature-desc">Up to 4 linked devices</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Connection Status Panel -->
                     <div class="system-monitor" style="margin-top: 1.5rem;">
                         <div class="monitor-header">
@@ -1613,15 +1415,27 @@
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-value" id="uptime-value">--</div>
-                            <div class="stat-label">Uptime</div>
+                            <div class="stat-label">Bot Uptime</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value" id="status-value">Initializing</div>
                             <div class="stat-label">Status</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">99.9%</div>
-                            <div class="stat-label">Reliability</div>
+                            <div class="stat-value" id="messages-value">--</div>
+                            <div class="stat-label">Messages</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="commands-value">--</div>
+                            <div class="stat-label">Commands</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="users-value">--</div>
+                            <div class="stat-label">Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="groups-value">--</div>
+                            <div class="stat-label">Groups</div>
                         </div>
                     </div>
 
@@ -1641,20 +1455,40 @@
 
                         <div class="metrics-grid">
                             <div class="metric-item">
-                                <div class="metric-value" id="latency-value">--</div>
-                                <div class="metric-label">Latency</div>
+                                <div class="metric-value" id="messages-rate-value">--</div>
+                                <div class="metric-label">Msg/Min</div>
                             </div>
                             <div class="metric-item">
-                                <div class="metric-value" id="memory-value">--</div>
+                                <div class="metric-value" id="commands-rate-value">--</div>
+                                <div class="metric-label">Cmd/Min</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="memory-usage-value">--</div>
                                 <div class="metric-label">Memory</div>
                             </div>
                             <div class="metric-item">
-                                <div class="metric-value" id="cpu-value">--</div>
-                                <div class="metric-label">CPU</div>
+                                <div class="metric-value" id="connection-status-value">--</div>
+                                <div class="metric-label">Status</div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Real-time Stats -->
+                        <div class="metrics-grid" style="margin-top: 1rem;">
+                            <div class="metric-item">
+                                <div class="metric-value" id="stickers-value">--</div>
+                                <div class="metric-label">Stickers</div>
                             </div>
                             <div class="metric-item">
-                                <div class="metric-value" id="requests-value">--</div>
-                                <div class="metric-label">Requests</div>
+                                <div class="metric-value" id="calls-blocked-value">--</div>
+                                <div class="metric-label">Calls Blocked</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="links-blocked-value">--</div>
+                                <div class="metric-label">Links Blocked</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-value" id="active-groups-value">--</div>
+                                <div class="metric-label">Active Groups</div>
                             </div>
                         </div>
 
@@ -1679,40 +1513,6 @@
                             <span style="margin-left: 0.5rem; font-weight: 600; color: var(--success-green);">
                                 End-to-End Encrypted
                             </span>
-                        </div>
-                    </div>
-
-                    <!-- Network Topology Visualization -->
-                    <div class="system-monitor">
-                        <div class="monitor-header">
-                            <div class="monitor-title">
-                                <i class="fas fa-network-wired"></i>
-                                Network Topology
-                            </div>
-                        </div>
-                        <div class="network-topology" id="network-topology">
-                            <!-- Nodes and connections will be generated by JavaScript -->
-                        </div>
-                    </div>
-
-                    <!-- Terminal Output -->
-                    <div class="system-monitor">
-                        <div class="monitor-header">
-                            <div class="monitor-title">
-                                <i class="fas fa-terminal"></i>
-                                System Logs
-                            </div>
-                        </div>
-                        <div class="terminal">
-                            <div class="terminal-header">
-                                <div class="terminal-dot red"></div>
-                                <div class="terminal-dot yellow"></div>
-                                <div class="terminal-dot green"></div>
-                                <span style="margin-left: 0.5rem; font-size: 0.7rem;">CloudNextra Bot Terminal</span>
-                            </div>
-                            <div id="terminal-output">
-                                <!-- Terminal lines will be added by JavaScript -->
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1794,8 +1594,6 @@
             constructor() {
                 this.initializeChart();
                 this.startSystemMonitoring();
-                this.createNetworkTopology();
-                this.initializeTerminal();
                 this.createMatrixEffect();
             }
 
@@ -1806,19 +1604,29 @@
                 performanceChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: Array.from({length: 20}, (_, i) => `${i}s`),
+                        labels: Array.from({length: 20}, (_, i) => {
+                            const time = new Date(Date.now() - (19 - i) * 10000); // 10 second intervals
+                            return time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                        }),
                         datasets: [{
-                            label: 'Response Time (ms)',
-                            data: Array.from({length: 20}, () => Math.random() * 100 + 50),
+                            label: 'Messages/min',
+                            data: Array.from({length: 20}, () => 0),
                             borderColor: '#25D366',
                             backgroundColor: 'rgba(37, 211, 102, 0.1)',
                             tension: 0.4,
                             fill: true
                         }, {
                             label: 'Memory Usage (%)',
-                            data: Array.from({length: 20}, () => Math.random() * 30 + 20),
+                            data: Array.from({length: 20}, () => 0),
                             borderColor: '#4f46e5',
                             backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }, {
+                            label: 'Commands/min',
+                            data: Array.from({length: 20}, () => 0),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
                             tension: 0.4,
                             fill: true
                         }]
@@ -1828,27 +1636,70 @@
                         maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                display: false
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 15,
+                                    font: {
+                                        size: 11
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: '#25D366',
+                                borderWidth: 1
                             }
                         },
                         scales: {
                             x: {
-                                display: false
+                                display: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    maxTicksLimit: 4,
+                                    font: {
+                                        size: 9
+                                    },
+                                    color: '#6b7280'
+                                }
                             },
                             y: {
-                                display: false,
+                                display: true,
+                                position: 'right',
                                 min: 0,
-                                max: 150
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 10
+                                    },
+                                    color: '#6b7280'
+                                }
                             }
                         },
                         elements: {
                             point: {
-                                radius: 0
+                                radius: 2,
+                                hoverRadius: 4
                             }
                         },
                         animation: {
                             duration: 750,
                             easing: 'easeInOutQuart'
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
                         }
                     }
                 });
@@ -1856,22 +1707,59 @@
 
             updateChart() {
                 if (!performanceChart) return;
+                // Chart will be updated by fetchBotStats() with real data
+            }
 
-                const newLatency = Math.random() * 50 + 25;
-                const newMemory = Math.random() * 20 + 30;
+            updateChartWithRealData(stats) {
+                if (!performanceChart || !stats) return;
 
+                // Calculate messages per minute rate
+                const currentTime = Date.now();
+                if (!this.lastStatsUpdate) {
+                    this.lastStatsUpdate = {
+                        time: currentTime,
+                        messages: stats.messagesReceived,
+                        commands: stats.commandsExecuted
+                    };
+                    return;
+                }
+
+                const timeDiff = (currentTime - this.lastStatsUpdate.time) / 1000 / 60; // minutes
+                const messageRate = Math.max(0, (stats.messagesReceived - this.lastStatsUpdate.messages) / timeDiff);
+                const commandRate = Math.max(0, (stats.commandsExecuted - this.lastStatsUpdate.commands) / timeDiff);
+                
+                // Calculate memory usage percentage
+                const memoryPercent = stats.memory ? (stats.memory.rss / stats.memory.heapTotal) * 100 : 0;
+
+                // Update chart data
                 performanceChart.data.datasets[0].data.shift();
-                performanceChart.data.datasets[0].data.push(newLatency);
+                performanceChart.data.datasets[0].data.push(Math.round(messageRate * 10) / 10);
+                
                 performanceChart.data.datasets[1].data.shift();
-                performanceChart.data.datasets[1].data.push(newMemory);
+                performanceChart.data.datasets[1].data.push(Math.round(memoryPercent * 10) / 10);
+                
+                performanceChart.data.datasets[2].data.shift();
+                performanceChart.data.datasets[2].data.push(Math.round(commandRate * 10) / 10);
+
+                // Update chart labels with current time
+                const timeLabel = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                performanceChart.data.labels.shift();
+                performanceChart.data.labels.push(timeLabel);
+
+                // Update y-axis max based on current data
+                const maxMessages = Math.max(...performanceChart.data.datasets[0].data);
+                const maxCommands = Math.max(...performanceChart.data.datasets[2].data);
+                const maxValue = Math.max(100, maxMessages, maxCommands, memoryPercent);
+                performanceChart.options.scales.y.max = Math.ceil(maxValue * 1.1);
 
                 performanceChart.update('none');
 
-                // Update metrics display
-                document.getElementById('latency-value').textContent = `${newLatency.toFixed(0)}ms`;
-                document.getElementById('memory-value').textContent = `${newMemory.toFixed(1)}%`;
-                document.getElementById('cpu-value').textContent = `${(Math.random() * 15 + 10).toFixed(1)}%`;
-                document.getElementById('requests-value').textContent = `${++systemMetrics.requests}`;
+                // Update last stats for next calculation
+                this.lastStatsUpdate = {
+                    time: currentTime,
+                    messages: stats.messagesReceived,
+                    commands: stats.commandsExecuted
+                };
             }
 
             startSystemMonitoring() {
@@ -1880,11 +1768,6 @@
                     this.updateChart();
                     this.updateConnectionQuality();
                 }, 2000);
-
-                // Add terminal logs periodically
-                setInterval(() => {
-                    this.addTerminalLog();
-                }, 5000);
             }
 
             updateConnectionQuality() {
@@ -1907,116 +1790,6 @@
 
                 qualityText.textContent = qualities[signal - 1];
                 qualityDetails.textContent = `${networkTypes[signal - 1]} Network • ${pings[signal - 1]}ms ping`;
-            }
-
-            createNetworkTopology() {
-                const container = document.getElementById('network-topology');
-                if (!container) return;
-
-                const nodes = [
-                    { id: 'C', x: 50, y: 50, label: 'Client' },
-                    { id: 'S', x: 150, y: 100, label: 'Server' },
-                    { id: 'W', x: 250, y: 50, label: 'WhatsApp' },
-                    { id: 'D', x: 200, y: 150, label: 'Database' }
-                ];
-
-                nodes.forEach((node, index) => {
-                    const nodeEl = document.createElement('div');
-                    nodeEl.className = 'node';
-                    nodeEl.textContent = node.id;
-                    nodeEl.style.left = `${node.x}px`;
-                    nodeEl.style.top = `${node.y}px`;
-                    nodeEl.style.animationDelay = `${index * 0.5}s`;
-                    container.appendChild(nodeEl);
-                });
-
-                // Create connections
-                const connections = [
-                    { from: 0, to: 1 },
-                    { from: 1, to: 2 },
-                    { from: 1, to: 3 },
-                    { from: 0, to: 2 }
-                ];
-
-                connections.forEach((conn, index) => {
-                    const line = document.createElement('div');
-                    line.className = 'connection-line';
-                    
-                    const from = nodes[conn.from];
-                    const to = nodes[conn.to];
-                    
-                    const dx = to.x - from.x;
-                    const dy = to.y - from.y;
-                    const length = Math.sqrt(dx * dx + dy * dy);
-                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                    
-                    line.style.width = `${length}px`;
-                    line.style.height = '2px';
-                    line.style.left = `${from.x + 10}px`;
-                    line.style.top = `${from.y + 10}px`;
-                    line.style.transform = `rotate(${angle}deg)`;
-                    line.style.transformOrigin = '0 0';
-                    line.style.animationDelay = `${index * 0.3}s`;
-                    
-                    container.appendChild(line);
-                });
-            }
-
-            initializeTerminal() {
-                const terminalOutput = document.getElementById('terminal-output');
-                if (!terminalOutput) return;
-
-                const initialLogs = [
-                    { type: 'prompt', text: 'cloudnextra-bot --version', delay: 0 },
-                    { type: 'success', text: 'CloudNextra Bot v3.0.0', delay: 500 },
-                    { type: 'prompt', text: 'npm start', delay: 1000 },
-                    { type: 'normal', text: '> cloudnextra-bot@3.0.0 start', delay: 1500 },
-                    { type: 'normal', text: '> node bot.js', delay: 2000 },
-                    { type: 'success', text: '✓ Bot initialized successfully', delay: 2500 },
-                    { type: 'success', text: '✓ Authentication state loaded', delay: 3000 },
-                    { type: 'warning', text: '⚠ Waiting for QR scan...', delay: 3500 }
-                ];
-
-                initialLogs.forEach((log, index) => {
-                    setTimeout(() => {
-                        this.addTerminalLine(log.text, log.type);
-                    }, log.delay);
-                });
-            }
-
-            addTerminalLine(text, type = 'normal') {
-                const terminalOutput = document.getElementById('terminal-output');
-                if (!terminalOutput) return;
-
-                const line = document.createElement('div');
-                line.className = `terminal-line terminal-${type}`;
-                line.textContent = text;
-                
-                if (type === 'prompt') {
-                    line.classList.add('terminal-prompt');
-                }
-
-                terminalOutput.appendChild(line);
-                terminalOutput.scrollTop = terminalOutput.scrollHeight;
-
-                // Keep only last 10 lines
-                while (terminalOutput.children.length > 10) {
-                    terminalOutput.removeChild(terminalOutput.firstChild);
-                }
-            }
-
-            addTerminalLog() {
-                const logs = [
-                    { type: 'success', text: '✓ Health check passed' },
-                    { type: 'normal', text: 'Processing QR request...' },
-                    { type: 'success', text: '✓ Security scan completed' },
-                    { type: 'normal', text: 'Optimizing connection...' },
-                    { type: 'success', text: '✓ Session validated' },
-                    { type: 'warning', text: '⚠ Auto-refresh in 30s' }
-                ];
-
-                const randomLog = logs[Math.floor(Math.random() * logs.length)];
-                this.addTerminalLine(randomLog.text, randomLog.type);
             }
 
             createMatrixEffect() {
@@ -2077,7 +1850,7 @@
             }
         }
 
-        // Enhanced QR fetching with better error handling
+        // Enhanced QR fetching with better error handling and real data
         async function fetchQRCode() {
             try {
                 const response = await fetch('/qr-data');
@@ -2150,7 +1923,6 @@
                         showSuccessAnimation();
                         successAnimationShown = true;
                     }
-                    techFeatures.addTerminalLine('✓ WhatsApp connection established', 'success');
                     
                 } else if (data.status === 'disconnected') {
                     container.innerHTML = `
@@ -2178,21 +1950,133 @@
                     throw new Error('Invalid response format');
                 }
                 
-                // Update uptime if available
+                // Update uptime from QR data
                 if (data.uptime) {
-                    document.getElementById('uptime-value').textContent = data.uptime;
+                    const uptimeFormatted = formatUptime(data.uptime);
+                    document.getElementById('uptime-value').textContent = uptimeFormatted;
                 }
 
                 // Log QR scan for first-time users
                 if (data.qr && !localStorage.getItem('qr_scanned_before')) {
-                    techFeatures.addTerminalLine('→ QR code generated successfully', 'normal');
+                    // QR code generated successfully
                 }
                 
             } catch (error) {
                 console.error('Error fetching QR code:', error);
                 handleConnectionError(error);
-                techFeatures.addTerminalLine(`✗ Connection failed: ${error.message}`, 'error');
             }
+        }
+
+        // New function to fetch real-time bot statistics
+        async function fetchBotStats() {
+            try {
+                const response = await fetch('/api/stats');
+                
+                if (!response.ok) {
+                    console.warn('Stats API not available:', response.status);
+                    return;
+                }
+
+                const stats = await response.json();
+                
+                // Update main stats grid
+                document.getElementById('messages-value').textContent = stats.messagesReceived.toLocaleString();
+                document.getElementById('commands-value').textContent = stats.commandsExecuted.toLocaleString();
+                document.getElementById('users-value').textContent = stats.uniqueUsers.toLocaleString();
+                document.getElementById('groups-value').textContent = stats.activeGroups.toLocaleString();
+                
+                // Update metrics
+                document.getElementById('stickers-value').textContent = stats.stickersCreated.toLocaleString();
+                document.getElementById('calls-blocked-value').textContent = stats.callsBlocked.toLocaleString();
+                document.getElementById('links-blocked-value').textContent = stats.linksBlocked.toLocaleString();
+                document.getElementById('active-groups-value').textContent = stats.activeGroups.toLocaleString();
+                
+                // Update memory usage
+                const memoryMB = (stats.memory.rss / 1024 / 1024).toFixed(1);
+                document.getElementById('memory-usage-value').textContent = `${memoryMB}MB`;
+                
+                // Calculate and update real-time rates
+                const currentTime = Date.now();
+                if (window.lastStatsTime && window.lastStatsData) {
+                    const timeDiff = (currentTime - window.lastStatsTime) / 1000 / 60; // minutes
+                    
+                    if (timeDiff > 0) {
+                        const messageRate = Math.max(0, (stats.messagesReceived - window.lastStatsData.messagesReceived) / timeDiff);
+                        const commandRate = Math.max(0, (stats.commandsExecuted - window.lastStatsData.commandsExecuted) / timeDiff);
+                        
+                        document.getElementById('messages-rate-value').textContent = messageRate.toFixed(1);
+                        document.getElementById('commands-rate-value').textContent = commandRate.toFixed(1);
+                    }
+                } else {
+                    document.getElementById('messages-rate-value').textContent = '0.0';
+                    document.getElementById('commands-rate-value').textContent = '0.0';
+                }
+                
+                // Update connection status
+                const connectionStatus = stats.isConnected ? 'Connected' : 'Disconnected';
+                const connectionElement = document.getElementById('connection-status-value');
+                if (connectionElement) {
+                    connectionElement.textContent = connectionStatus;
+                    connectionElement.style.color = stats.isConnected ? 'var(--success-green)' : 'var(--error-red)';
+                }
+                
+                // Store current stats for next rate calculation
+                window.lastStatsTime = currentTime;
+                window.lastStatsData = {
+                    messagesReceived: stats.messagesReceived,
+                    commandsExecuted: stats.commandsExecuted
+                };
+                
+                // Update uptime - use bot uptime instead of server uptime
+                if (stats.isConnected) {
+                    document.getElementById('uptime-value').textContent = stats.botUptimeFormatted;
+                } else {
+                    document.getElementById('uptime-value').textContent = stats.botUptimeFormatted || 'Disconnected';
+                }
+                
+                // Update last activity info
+                const lastActivityElement = document.getElementById('quality-details');
+                if (lastActivityElement && stats.lastActivityFormatted) {
+                    lastActivityElement.textContent = `Last Activity: ${stats.lastActivityFormatted}`;
+                }
+                
+                // Update chart with real data
+                if (techFeatures && techFeatures.updateChartWithRealData) {
+                    techFeatures.updateChartWithRealData(stats);
+                }
+                
+                // Update configuration status
+                const configElement = document.getElementById('quality-text');
+                if (configElement) {
+                    const configStatus = [];
+                    if (stats.configuration.autoRead) configStatus.push('AutoRead');
+                    if (stats.configuration.antiCall) configStatus.push('AntiCall');
+                    if (stats.configuration.antilinkGroupsCount > 0) configStatus.push(`${stats.configuration.antilinkGroupsCount} AntiLink`);
+                    
+                    configElement.textContent = configStatus.length > 0 ? configStatus.join(' • ') : 'Standard Mode';
+                }
+                
+                console.log('Stats updated:', stats);
+                
+            } catch (error) {
+                console.warn('Error fetching bot stats:', error);
+            }
+        }
+
+        // Helper function to format uptime
+        function formatUptime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            let result = '';
+            if (days > 0) result += `${days}d `;
+            if (hours % 24 > 0) result += `${hours % 24}h `;
+            if (minutes % 60 > 0) result += `${minutes % 60}m `;
+            if (result === '' || seconds % 60 > 0) result += `${seconds % 60}s`;
+            
+            return result.trim();
         }
 
         // Enhanced error handling
@@ -2306,8 +2190,6 @@
             button.disabled = true;
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
             
-            techFeatures.addTerminalLine('→ Refreshing QR code...', 'normal');
-            
             try {
                 await fetchQRCode();
                 resetCountdown();
@@ -2406,6 +2288,7 @@
             createParticles();
             techFeatures = new AdvancedTechFeatures();
             fetchQRCode();
+            fetchBotStats(); // Fetch initial stats
             startCountdown();
             
             // Initialize uptime display
@@ -2414,11 +2297,14 @@
             // Start connection stats updates
             setInterval(updateConnectionStats, 1000);
             
+            // Start real-time stats updates every 5 seconds
+            setInterval(fetchBotStats, 5000);
+            
             // Register Service Worker for PWA capabilities
             if ('serviceWorker' in navigator) {
                 const swCode = `
                     const CACHE_NAME = 'cloudnextra-bot-v1';
-                    const urlsToCache = ['./', '/qr-data'];
+                    const urlsToCache = ['./', '/qr-data', '/api/stats'];
                     
                     self.addEventListener('install', event => {
                         event.waitUntil(
@@ -2451,13 +2337,13 @@
         // Enhanced status checking with performance monitoring
         setInterval(() => {
             fetchQRCode();
+            fetchBotStats(); // Also fetch stats periodically
             
             // Simulate performance metrics collection
             if (techFeatures) {
-                const now = new Date();
-                techFeatures.addTerminalLine(`[${now.toLocaleTimeString()}] System heartbeat`, 'normal');
+                techFeatures.updateChart();
             }
-        }, 5000);
+        }, 10000); // Reduced to 10 seconds for better real-time feel
 
         // Add keyboard shortcuts with notifications
         document.addEventListener('keydown', (e) => {
@@ -2480,11 +2366,9 @@
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 clearInterval(countdownInterval);
-                techFeatures.addTerminalLine('⏸ Tab inactive - pausing updates', 'warning');
             } else {
                 startCountdown();
                 fetchQRCode();
-                techFeatures.addTerminalLine('▶ Tab active - resuming updates', 'success');
             }
         });
 
@@ -2494,10 +2378,7 @@
                 setTimeout(() => {
                     const perfData = performance.getEntriesByType('navigation')[0];
                     const loadTime = perfData.loadEventEnd - perfData.loadEventStart;
-                    
-                    if (techFeatures) {
-                        techFeatures.addTerminalLine(`✓ Page loaded in ${loadTime.toFixed(0)}ms`, 'success');
-                    }
+                    console.log(`Page loaded in ${loadTime.toFixed(0)}ms`);
                 }, 100);
             });
         }
@@ -2506,12 +2387,7 @@
         if ('connection' in navigator) {
             const connection = navigator.connection;
             const updateConnectionInfo = () => {
-                if (techFeatures) {
-                    techFeatures.addTerminalLine(
-                        `Network: ${connection.effectiveType} • ${connection.downlink}Mbps`, 
-                        'normal'
-                    );
-                }
+                console.log(`Network: ${connection.effectiveType} • ${connection.downlink}Mbps`);
             };
             
             connection.addEventListener('change', updateConnectionInfo);
@@ -2523,26 +2399,15 @@
             navigator.getBattery().then(battery => {
                 const level = Math.round(battery.level * 100);
                 
-                // Show battery status in terminal
-                if (techFeatures) {
-                    techFeatures.addTerminalLine(`🔋 Battery: ${level}%`, level < 20 ? 'warning' : 'normal');
-                }
-                
                 if (level < 20) {
                     // Enable power saving mode
                     document.body.classList.add('power-saving');
-                    
-                    if (techFeatures) {
-                        techFeatures.addTerminalLine('⚡ Power saving mode enabled', 'warning');
-                    }
                 }
                 
                 // Listen for battery status changes
                 battery.addEventListener('levelchange', () => {
                     const newLevel = Math.round(battery.level * 100);
-                    if (techFeatures) {
-                        techFeatures.addTerminalLine(`🔋 Battery: ${newLevel}%`, newLevel < 20 ? 'warning' : 'normal');
-                    }
+                    console.log(`Battery: ${newLevel}%`);
                 });
             });
         }

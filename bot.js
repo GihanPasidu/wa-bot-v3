@@ -33,6 +33,26 @@ const startTime = Date.now();
 let currentQRCode = null;
 let connectionStatus = 'disconnected'; // 'disconnected', 'connecting', 'connected'
 
+// Real-time statistics tracking
+const botStats = {
+    messagesReceived: 0,
+    messagesProcessed: 0,
+    commandsExecuted: 0,
+    usersInteracted: new Set(),
+    groupsActive: new Set(),
+    lastActivity: Date.now(),
+    sessionsCount: 0,
+    errorCount: 0,
+    warningsSent: 0,
+    stickersCreated: 0,
+    mediaProcessed: 0,
+    callsBlocked: 0,
+    linksBlocked: 0,
+    startTime: Date.now(),
+    botConnectedTime: null, // Track when bot actually connected to WhatsApp
+    isConnected: false
+};
+
 // Warning system storage
 const warnings = new Map(); // groupJid -> Map(userJid -> count)
 
@@ -478,6 +498,36 @@ function getSelfChatTargetJid(senderJid, fromJid) {
         return '94788006269@s.whatsapp.net';
     }
     return fromJid;
+}
+
+// Helper functions for formatting
+function formatUptime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    let result = '';
+    if (days > 0) result += `${days}d `;
+    if (hours % 24 > 0) result += `${hours % 24}h `;
+    if (minutes % 60 > 0) result += `${minutes % 60}m `;
+    result += `${seconds % 60}s`;
+    
+    return result.trim();
+}
+
+function formatTimeSince(ms) {
+    if (ms < 1000) return 'Just now';
+    
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
 }
 
 // Helper function to send error messages to users
@@ -987,9 +1037,19 @@ async function startBot() {
             // Update connection status for web interface
             connectionStatus = 'connected';
             currentQRCode = null;
+            botStats.sessionsCount++;
+            
+            // Track bot connection time
+            botStats.botConnectedTime = Date.now();
+            botStats.isConnected = true;
         } else if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQRCode = null;
+            
+            // Track bot disconnection
+            botStats.isConnected = false;
+            // Don't reset botConnectedTime - keep it to show last session duration
+            
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('⚠️  Connection Lost. Attempting Reconnection:', shouldReconnect);
             if (shouldReconnect) startBot();
@@ -1007,6 +1067,11 @@ async function startBot() {
         for (const msg of messages) {
             const from = msg.key.remoteJid;
             if (!from) continue;
+            
+            // Track message statistics
+            botStats.messagesReceived++;
+            botStats.lastActivity = Date.now();
+            
             // Handle status updates: mark as read if autoRead, then skip further processing
             if (from === 'status@broadcast') {
                 if (config.autoRead) {
@@ -1017,6 +1082,12 @@ async function startBot() {
 
             const senderJid = (msg.key.participant || msg.key.remoteJid);
             const body = getTextFromMessage(msg) || '';
+            
+            // Track user interactions
+            botStats.usersInteracted.add(senderJid);
+            if (from.endsWith('@g.us')) {
+                botStats.groupsActive.add(from);
+            }
             
             // Check if it's a group and if user is admin for group commands
             const isGroup = from.endsWith('@g.us');
@@ -1064,6 +1135,9 @@ async function startBot() {
 
             // Check for links if antilink is enabled
             if (isGroup && isAntilinkEnabled(from) && !isAdmin && containsLink(body)) {
+                // Track link blocking
+                botStats.linksBlocked++;
+                
                 try {
                     // Delete the original message containing the link
                     await sock.sendMessage(from, { 
@@ -1076,6 +1150,7 @@ async function startBot() {
                     });
                 } catch (error) {
                     console.error('Error handling antilink:', error);
+                    botStats.errorCount++;
                     // If deletion fails, at least send the warning
                     try {
                         await sock.sendMessage(from, { 
@@ -1100,6 +1175,10 @@ async function startBot() {
                 console.log(`Received command: ${fullCommand} from ${from}`);
                 console.log(`Parsed command: "${command}"`);
                 console.log(`Is Group: ${isGroup}, Is Admin: ${isAdmin}, Is Bot Admin: ${isBotAdmin}`);
+                
+                // Track command execution
+                botStats.commandsExecuted++;
+                botStats.messagesProcessed++;
                 
                 // If bot is OFF, only allow .on command
                 if (!config.botEnabled && command !== '.on') {
@@ -1309,6 +1388,9 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         break;
                     }
                     case '.sticker': {
+                        // Track media processing
+                        botStats.mediaProcessed++;
+                        
                         // Check for image or GIF in the triggering message or quoted message
                         let mediaMsg = null;
                         let isGif = false;
@@ -1382,8 +1464,12 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                             await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
                             await sock.sendMessage(from, { text: successMessage }, { quoted: msg });
                             
+                            // Track successful sticker creation
+                            botStats.stickersCreated++;
+                            
                         } catch (e) {
                             console.error('Error creating sticker:', e);
+                            botStats.errorCount++;
                             await sendErrorMessage(sock, senderJid, from, 'STICKER_FAILED');
                         }
                         break;
@@ -1782,16 +1868,36 @@ Here's everything you can do with this bot:
                     case '.stats': {
                         try {
                             const targetJid = getSelfChatTargetJid(senderJid, from);
-                            const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
-                            const uptimeMinutes = Math.floor(uptimeSeconds / 60);
-                            const uptimeHours = Math.floor(uptimeMinutes / 60);
-                            const uptimeDays = Math.floor(uptimeHours / 24);
                             
-                            let uptimeString = '';
-                            if (uptimeDays > 0) uptimeString += `${uptimeDays}d `;
-                            if (uptimeHours % 24 > 0) uptimeString += `${uptimeHours % 24}h `;
-                            if (uptimeMinutes % 60 > 0) uptimeString += `${uptimeMinutes % 60}m `;
-                            uptimeString += `${uptimeSeconds % 60}s`;
+                            // Calculate server uptime
+                            const serverUptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+                            const serverUptimeMinutes = Math.floor(serverUptimeSeconds / 60);
+                            const serverUptimeHours = Math.floor(serverUptimeMinutes / 60);
+                            const serverUptimeDays = Math.floor(serverUptimeHours / 24);
+                            
+                            let serverUptimeString = '';
+                            if (serverUptimeDays > 0) serverUptimeString += `${serverUptimeDays}d `;
+                            if (serverUptimeHours % 24 > 0) serverUptimeString += `${serverUptimeHours % 24}h `;
+                            if (serverUptimeMinutes % 60 > 0) serverUptimeString += `${serverUptimeMinutes % 60}m `;
+                            serverUptimeString += `${serverUptimeSeconds % 60}s`;
+                            
+                            // Calculate bot uptime (actual WhatsApp connection time)
+                            let botUptimeString = 'Not connected';
+                            if (botStats.isConnected && botStats.botConnectedTime) {
+                                const botUptimeMs = Date.now() - botStats.botConnectedTime;
+                                const botUptimeSeconds = Math.floor(botUptimeMs / 1000);
+                                const botUptimeMinutes = Math.floor(botUptimeSeconds / 60);
+                                const botUptimeHours = Math.floor(botUptimeMinutes / 60);
+                                const botUptimeDays = Math.floor(botUptimeHours / 24);
+                                
+                                botUptimeString = '';
+                                if (botUptimeDays > 0) botUptimeString += `${botUptimeDays}d `;
+                                if (botUptimeHours % 24 > 0) botUptimeString += `${botUptimeHours % 24}h `;
+                                if (botUptimeMinutes % 60 > 0) botUptimeString += `${botUptimeMinutes % 60}m `;
+                                botUptimeString += `${botUptimeSeconds % 60}s`;
+                            } else if (botStats.botConnectedTime) {
+                                botUptimeString = 'Disconnected';
+                            }
                             
                             const memoryUsage = process.memoryUsage();
                             const memoryMB = (memoryUsage.rss / 1024 / 1024).toFixed(2);
@@ -1800,8 +1906,9 @@ Here's everything you can do with this bot:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⏱️ **Uptime Information:**
-• 🚀 Started: ${getSriLankaTime().toLocaleString()} (SLST)
-• ⏰ Running: ${uptimeString.trim()}
+• 🚀 Server Started: ${getSriLankaTime().toLocaleString()} (SLST)
+• 🖥️ Server Uptime: ${serverUptimeString.trim()}
+• 🤖 Bot Uptime: ${botUptimeString.trim()}
 • 📅 Current: ${getSriLankaTime().toLocaleString()} (SLST)
 
 💻 **System Performance:**
@@ -1810,16 +1917,23 @@ Here's everything you can do with this bot:
 • 🏗️ Platform: ${process.platform}
 
 🤖 **Bot Status:**
-• 🟢 Status: Active & Responsive
-• 📡 Connection: Stable
+• 🟢 Status: ${botStats.isConnected ? 'Connected & Active' : 'Disconnected'}
+• 📡 Connection: ${botStats.isConnected ? 'Stable' : 'Reconnecting'}
 • 🛡️ Auto view status: ${config.autoRead ? 'Enabled' : 'Disabled'}
 • 📵 Anti Call: ${config.antiCall ? 'Enabled' : 'Disabled'}
+
+📊 **Activity Statistics:**
+• 📨 Messages Received: ${botStats.messagesReceived.toLocaleString()}
+• ⚡ Commands Executed: ${botStats.commandsExecuted.toLocaleString()}
+• 👥 Unique Users: ${botStats.usersInteracted.size.toLocaleString()}
+• 🎨 Stickers Created: ${botStats.stickersCreated.toLocaleString()}
 
 📈 **Feature Statistics:**
 • 👥 Muted Groups: ${mutedGroups.size}
 • ⚠️ Warning System: Active
 • 🔗 Antilink Groups: ${antilinkGroups.size}
-• 🔐 Admin Protection: Enabled
+• � Calls Blocked: ${botStats.callsBlocked.toLocaleString()}
+• 🚫 Links Blocked: ${botStats.linksBlocked.toLocaleString()}
 
 ⚡ **Performance Metrics:**
 • 🚀 Response Time: Optimized
@@ -2812,6 +2926,9 @@ Try \`.ghelp\` for group commands.`;
             for (const call of calls) {
                 if (!config.antiCall) continue;
                 if (call.status === 'offer') {
+                    // Track call blocking
+                    botStats.callsBlocked++;
+                    
                     // Some Baileys versions expose rejectCall; if not, just notify
                     if (typeof sock.rejectCall === 'function') {
                         try { await sock.rejectCall(call.id, call.from); } catch (_) {}
@@ -2821,6 +2938,7 @@ Try \`.ghelp\` for group commands.`;
             }
         } catch (err) {
             console.error('Call handling error:', err);
+            botStats.errorCount++;
         }
     });
 }
@@ -2879,8 +2997,76 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
             qr: currentQRCode,
             status: connectionStatus,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            uptime: Date.now() - startTime
         }));
+    } else if (req.url === '/api/stats') {
+        // Serve real-time bot statistics
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        
+        const currentTime = Date.now();
+        const serverUptimeMs = currentTime - startTime;
+        const lastActivityMs = currentTime - botStats.lastActivity;
+        
+        // Calculate bot uptime (time since actual WhatsApp connection)
+        let botUptimeMs = 0;
+        let botUptimeFormatted = 'Not connected';
+        if (botStats.isConnected && botStats.botConnectedTime) {
+            botUptimeMs = currentTime - botStats.botConnectedTime;
+            botUptimeFormatted = formatUptime(botUptimeMs);
+        } else if (botStats.botConnectedTime) {
+            // Show last session duration if disconnected
+            botUptimeFormatted = 'Disconnected';
+        }
+        
+        const statsData = {
+            // Basic stats
+            messagesReceived: botStats.messagesReceived,
+            messagesProcessed: botStats.messagesProcessed,
+            commandsExecuted: botStats.commandsExecuted,
+            
+            // User/Group stats
+            uniqueUsers: botStats.usersInteracted.size,
+            activeGroups: botStats.groupsActive.size,
+            
+            // Feature usage
+            stickersCreated: botStats.stickersCreated,
+            mediaProcessed: botStats.mediaProcessed,
+            callsBlocked: botStats.callsBlocked,
+            linksBlocked: botStats.linksBlocked,
+            
+            // System stats
+            sessionsCount: botStats.sessionsCount,
+            errorCount: botStats.errorCount,
+            
+            // Uptime information
+            serverUptime: serverUptimeMs,
+            serverUptimeFormatted: formatUptime(serverUptimeMs),
+            botUptime: botUptimeMs,
+            botUptimeFormatted: botUptimeFormatted,
+            isConnected: botStats.isConnected,
+            connectionTime: botStats.botConnectedTime,
+            
+            lastActivity: botStats.lastActivity,
+            lastActivityFormatted: formatTimeSince(lastActivityMs),
+            
+            // Configuration
+            configuration: {
+                autoRead: config.autoRead,
+                antiCall: config.antiCall,
+                botEnabled: config.botEnabled,
+                mutedGroupsCount: mutedGroups.size,
+                antilinkGroupsCount: antilinkGroups.size
+            },
+            
+            // Performance metrics
+            memory: process.memoryUsage(),
+            nodeVersion: process.version,
+            platform: process.platform,
+            timestamp: new Date().toISOString()
+        };
+        
+        res.end(JSON.stringify(statsData, null, 2));
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Not Found');
