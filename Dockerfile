@@ -15,9 +15,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy application files
 COPY . .
 
-# Create non-root user with specific UID/GID
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S botuser -u 1001 -G nodejs
+# Create non-root user with specific UID/GID (Debian syntax)
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home botuser
 
 # Change ownership and switch to non-root user
 RUN chown -R botuser:nodejs /app
