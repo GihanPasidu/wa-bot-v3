@@ -1951,9 +1951,13 @@
                 }
                 
                 // Update uptime from QR data
-                if (data.uptime) {
+                if (data.isConnected && data.uptime && data.uptime > 0) {
                     const uptimeFormatted = formatUptime(data.uptime);
                     document.getElementById('uptime-value').textContent = uptimeFormatted;
+                } else if (data.isConnected === false) {
+                    document.getElementById('uptime-value').textContent = 'Not connected';
+                } else if (!data.uptime || data.uptime === 0) {
+                    document.getElementById('uptime-value').textContent = 'Not connected';
                 }
 
                 // Log QR scan for first-time users
@@ -2206,23 +2210,12 @@
             }
         }
 
-        // Update connection stats
+        // Update connection stats (removed uptime calculation - now handled by API)
         function updateConnectionStats() {
-            const uptimeElement = document.getElementById('uptime-value');
             const refreshCountElement = document.getElementById('refresh-count');
             
-            if (uptimeElement) {
-                const uptime = Math.floor((Date.now() - qrStartTime) / 1000);
-                if (uptime < 60) {
-                    uptimeElement.textContent = `${uptime}s`;
-                } else if (uptime < 3600) {
-                    uptimeElement.textContent = `${Math.floor(uptime / 60)}m ${uptime % 60}s`;
-                } else {
-                    const hours = Math.floor(uptime / 3600);
-                    const minutes = Math.floor((uptime % 3600) / 60);
-                    uptimeElement.textContent = `${hours}h ${minutes}m`;
-                }
-            }
+            // DO NOT update uptime here - it's managed by fetchQRCode() and fetchBotStats()
+            // Uptime should reflect actual bot connection time from the server, not page load time
             
             if (refreshCountElement) {
                 refreshCountElement.textContent = refreshCount.toString();

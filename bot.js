@@ -2958,15 +2958,32 @@ const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         
+        // Calculate server and bot uptime
+        const serverUptimeMs = Date.now() - startTime;
+        let botUptimeMs = 0;
+        let botUptimeFormatted = 'Not connected';
+        
+        if (botStats.isConnected && botStats.botConnectedTime) {
+            botUptimeMs = Date.now() - botStats.botConnectedTime;
+            botUptimeFormatted = formatUptime(botUptimeMs);
+        }
+        
         // Comprehensive health status
         const healthData = {
             status: 'healthy',
-            uptime: Date.now() - startTime,
-            uptimeFormatted: `${Math.floor((Date.now() - startTime) / (1000 * 60 * 60))}h ${Math.floor(((Date.now() - startTime) % (1000 * 60 * 60)) / (1000 * 60))}m`,
+            serverUptime: serverUptimeMs,
+            serverUptimeFormatted: formatUptime(serverUptimeMs),
+            botUptime: botUptimeMs,
+            botUptimeFormatted: botUptimeFormatted,
+            // Keep old 'uptime' field for backward compatibility - use bot uptime when connected
+            uptime: botUptimeMs > 0 ? botUptimeMs : serverUptimeMs,
+            uptimeFormatted: botUptimeMs > 0 ? botUptimeFormatted : formatUptime(serverUptimeMs),
             timestamp: new Date().toISOString(),
             connection: {
                 status: connectionStatus,
+                isConnected: botStats.isConnected,
                 hasQR: !!currentQRCode,
+                connectedAt: botStats.botConnectedTime ? new Date(botStats.botConnectedTime).toISOString() : null,
                 lastPing: lastSuccessfulPing ? new Date(lastSuccessfulPing).toISOString() : null,
                 timeSinceLastPing: lastSuccessfulPing ? Date.now() - lastSuccessfulPing : null
             },
@@ -2994,11 +3011,20 @@ const server = http.createServer((req, res) => {
     } else if (req.url === '/qr-data') {
         // Serve QR code data as JSON
         res.writeHead(200, { 'Content-Type': 'application/json' });
+        
+        // Calculate bot uptime (time since actual WhatsApp connection)
+        let botUptimeMs = 0;
+        if (botStats.isConnected && botStats.botConnectedTime) {
+            botUptimeMs = Date.now() - botStats.botConnectedTime;
+        }
+        
         res.end(JSON.stringify({
             qr: currentQRCode,
             status: connectionStatus,
             timestamp: new Date().toISOString(),
-            uptime: Date.now() - startTime
+            uptime: botUptimeMs, // Bot uptime, not server uptime
+            isConnected: botStats.isConnected,
+            botConnectedTime: botStats.botConnectedTime
         }));
     } else if (req.url === '/api/stats') {
         // Serve real-time bot statistics
