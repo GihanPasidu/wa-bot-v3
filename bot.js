@@ -3,7 +3,8 @@ const {
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
     DisconnectReason,
-    downloadMediaMessage
+    downloadMediaMessage,
+    delay
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
@@ -393,6 +394,10 @@ function getTextFromMessage(msg) {
         (m.extendedTextMessage && m.extendedTextMessage.text) ||
         (m.imageMessage && m.imageMessage.caption) ||
         (m.videoMessage && m.videoMessage.caption) ||
+        (m.documentMessage && m.documentMessage.caption) ||
+        (m.documentWithCaptionMessage && m.documentWithCaptionMessage.message?.documentMessage?.caption) ||
+        (m.editedMessage && m.editedMessage.message?.extendedTextMessage?.text) ||
+        (m.editedMessage && m.editedMessage.message?.conversation) ||
         ''
     );
 }
@@ -987,7 +992,14 @@ async function startBot() {
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ['CloudNextra Bot', 'Desktop', '3.0.0']
+        browser: ['CloudNextra Bot', 'Desktop', '3.0.0'],
+        getMessage: async (key) => {
+            return {
+                conversation: 'CloudNextra Bot'
+            };
+        },
+        defaultQueryTimeoutMs: undefined,
+        syncFullHistory: false
     });
 
     // Save credentials properly
@@ -1065,23 +1077,24 @@ async function startBot() {
     sock.ev.on('messages.upsert', async ({ type, messages }) => {
         if (type !== 'notify') return;
         for (const msg of messages) {
-            const from = msg.key.remoteJid;
-            if (!from) continue;
-            
-            // Track message statistics
-            botStats.messagesReceived++;
-            botStats.lastActivity = Date.now();
-            
-            // Handle status updates: mark as read if autoRead, then skip further processing
-            if (from === 'status@broadcast') {
-                if (config.autoRead) {
-                    try { await sock.readMessages([msg.key]); } catch (_) {}
+            try {
+                const from = msg.key.remoteJid;
+                if (!from) continue;
+                
+                // Track message statistics
+                botStats.messagesReceived++;
+                botStats.lastActivity = Date.now();
+                
+                // Handle status updates: mark as read if autoRead, then skip further processing
+                if (from === 'status@broadcast') {
+                    if (config.autoRead) {
+                        try { await sock.readMessages([msg.key]); } catch (_) {}
+                    }
+                    continue;
                 }
-                continue;
-            }
 
-            const senderJid = (msg.key.participant || msg.key.remoteJid);
-            const body = getTextFromMessage(msg) || '';
+                const senderJid = (msg.key.participant || msg.key.remoteJid);
+                const body = getTextFromMessage(msg) || '';
             
             // Track user interactions
             botStats.usersInteracted.add(senderJid);
@@ -2916,6 +2929,11 @@ Try \`.ghelp\` for group commands.`;
                         await sock.sendMessage(targetJid, { text: helpMessage }, { quoted: msg });
                     }
                 }
+            }
+            } catch (messageError) {
+                console.error('Error processing message:', messageError);
+                botStats.errorCount++;
+                // Silently continue to next message
             }
         }
     });
