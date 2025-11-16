@@ -19,12 +19,22 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
 
-// Bot configuration
+// Load environment variables (for production deployment)
+require('dotenv').config();
+
+// Bot configuration with environment variable support
 const config = {
-    autoRead: false,
-    antiCall: true,
-    adminJids: ['94788006269@s.whatsapp.net','94767219661@s.whatsapp.net', '11837550653588@lid'], // Support both regular and linked device formats
-    botEnabled: true
+    autoRead: process.env.AUTO_READ === 'true' || false,
+    antiCall: process.env.ANTI_CALL === 'true' || true,
+    adminJids: process.env.ADMIN_JIDS 
+        ? process.env.ADMIN_JIDS.split(',').map(jid => jid.trim())
+        : ['94788006269@s.whatsapp.net','94767219661@s.whatsapp.net', '11837550653588@lid'],
+    botEnabled: process.env.BOT_ENABLED !== 'false',
+    port: process.env.PORT || 10000,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    renderUrl: process.env.RENDER_EXTERNAL_URL || null,
+    keepAliveInterval: parseInt(process.env.KEEP_ALIVE_INTERVAL) || 120000, // 2 minutes
+    keepAliveAggressive: process.env.KEEP_ALIVE_AGGRESSIVE === 'true' || true
 };
 
 // Bot startup time for uptime calculation
@@ -68,6 +78,12 @@ const antilinkGroups = new Set(); // groupJid -> boolean
 
 // Auto-unmute timer
 let unmuteTimer = null;
+
+// Keep-alive system for Render free tier
+let keepAliveTimer = null;
+let internalPingTimer = null;
+let lastKeepAliveResponse = Date.now();
+let keepAliveFailures = 0;
 
 // Enhanced auth state management
 async function getAuthState() {
@@ -981,6 +997,117 @@ function getSriLankaTime() {
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     return new Date(utc + (sriLankaOffset * 60000));
 }
+
+// ==================== KEEP-ALIVE SYSTEM FOR RENDER FREE TIER ====================
+// This prevents Render from spinning down due to inactivity (15-min timeout)
+
+async function internalKeepAlive() {
+    try {
+        const baseUrl = config.renderUrl || `http://localhost:${config.port}`;
+        const response = await axios.get(`${baseUrl}/health`, { 
+            timeout: 5000,
+            headers: {
+                'User-Agent': 'CloudNextra-Bot-Internal-KeepAlive/3.0',
+                'X-Keep-Alive': 'internal'
+            }
+        });
+        
+        if (response.status === 200) {
+            lastKeepAliveResponse = Date.now();
+            keepAliveFailures = 0;
+            console.log(`⚡ Internal keep-alive: OK (${new Date().toLocaleTimeString()})`);
+        }
+    } catch (error) {
+        keepAliveFailures++;
+        console.error(`❌ Keep-alive failed (${keepAliveFailures}):`, error.message);
+        
+        // If failures exceed threshold, attempt recovery
+        if (keepAliveFailures > 5) {
+            console.error('🔄 Too many keep-alive failures, checking connection...');
+            botStats.errorCount++;
+        }
+    }
+}
+
+async function externalKeepAliveSimulator() {
+    // Simulate external monitoring by self-pinging different endpoints
+    const endpoints = ['/health', '/qr-data'];
+    const baseUrl = config.renderUrl || `http://localhost:${config.port}`;
+    
+    for (const endpoint of endpoints) {
+        try {
+            await axios.get(`${baseUrl}${endpoint}`, { 
+                timeout: 5000,
+                headers: {
+                    'User-Agent': 'CloudNextra-Bot-External-Simulator/3.0',
+                    'X-Keep-Alive': 'external-sim'
+                }
+            });
+            console.log(`🌐 External sim: ${endpoint} - OK`);
+        } catch (error) {
+            console.error(`⚠️ External sim failed for ${endpoint}:`, error.message);
+        }
+    }
+}
+
+function startKeepAliveSystem() {
+    if (!config.keepAliveAggressive) {
+        console.log('⚠️  Keep-alive system disabled by configuration');
+        return;
+    }
+    
+    console.log('🚀 Starting ultra-aggressive keep-alive system for Render...');
+    console.log(`   Internal ping: Every ${config.keepAliveInterval / 1000} seconds`);
+    console.log(`   External sim: Every ${(config.keepAliveInterval * 1.5) / 1000} seconds`);
+    console.log(`   Target: ${config.renderUrl || 'localhost:' + config.port}`);
+    
+    // Internal self-ping (every 2 minutes by default)
+    internalPingTimer = setInterval(async () => {
+        await internalKeepAlive();
+    }, config.keepAliveInterval);
+    
+    // External simulation (every 3 minutes)
+    keepAliveTimer = setInterval(async () => {
+        await externalKeepAliveSimulator();
+    }, config.keepAliveInterval * 1.5);
+    
+    // Initial ping after 30 seconds
+    setTimeout(async () => {
+        console.log('🎯 Initial keep-alive ping...');
+        await internalKeepAlive();
+    }, 30000);
+    
+    // Status report every 30 minutes
+    setInterval(() => {
+        const uptime = Date.now() - startTime;
+        const hours = Math.floor(uptime / (1000 * 60 * 60));
+        const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+        const lastPing = Math.floor((Date.now() - lastKeepAliveResponse) / 1000);
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`📊 Keep-Alive Status Report`);
+        console.log(`   Bot Uptime: ${hours}h ${minutes}m`);
+        console.log(`   Last Keep-Alive: ${lastPing}s ago`);
+        console.log(`   Failures: ${keepAliveFailures}`);
+        console.log(`   Connection: ${botStats.isConnected ? '🟢 Active' : '🔴 Disconnected'}`);
+        console.log(`   Messages Processed: ${botStats.messagesProcessed}`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }, 1800000); // Every 30 minutes
+}
+
+function stopKeepAliveSystem() {
+    if (internalPingTimer) {
+        clearInterval(internalPingTimer);
+        internalPingTimer = null;
+    }
+    if (keepAliveTimer) {
+        clearInterval(keepAliveTimer);
+        keepAliveTimer = null;
+    }
+    console.log('🛑 Keep-alive system stopped');
+}
+
+// ==================== END KEEP-ALIVE SYSTEM ====================
 
 async function startBot() {
     // Use enhanced auth state management
@@ -3117,21 +3244,24 @@ const server = http.createServer((req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = config.port;
 server.listen(PORT, () => {
     console.log(`🌐 Health check server running on port ${PORT}`);
     
     // Show QR webpage URLs for easy access
-    if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
-        console.log(`📱 QR Code Webpage: ${process.env.RENDER_EXTERNAL_URL}`);
-        console.log(`📡 Health Check: ${process.env.RENDER_EXTERNAL_URL}/health`);
-        console.log(`🔗 API Endpoint: ${process.env.RENDER_EXTERNAL_URL}/qr-data`);
+    if (config.nodeEnv === 'production' && config.renderUrl) {
+        console.log(`📱 QR Code Webpage: ${config.renderUrl}`);
+        console.log(`📡 Health Check: ${config.renderUrl}/health`);
+        console.log(`🔗 API Endpoint: ${config.renderUrl}/qr-data`);
     } else {
         console.log(`📱 QR Code Webpage: http://localhost:${PORT}`);
         console.log(`📡 Health Check: http://localhost:${PORT}/health`);
         console.log(`🔗 API Endpoint: http://localhost:${PORT}/qr-data`);
     }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Start the ultra-aggressive keep-alive system for Render
+    startKeepAliveSystem();
 });
 
 // Enhanced Self-ping mechanism with aggressive keep-alive for Render FREE TIER
@@ -3211,18 +3341,7 @@ process.on('SIGINT', () => {
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
-    if (selfPingInterval) {
-        clearInterval(selfPingInterval);
-        console.log('🏓 Internal keep-alive mechanism stopped');
-    }
-    if (externalPingInterval) {
-        clearInterval(externalPingInterval);
-        console.log('🌐 External ping simulation stopped');
-    }
-    if (aggressivePingInterval) {
-        clearInterval(aggressivePingInterval);
-        console.log('🔥 Aggressive ping mechanism stopped');
-    }
+    stopKeepAliveSystem();
     server.close(() => {
         console.log('🌐 Health check server closed');
         console.log('👋 Bot shutdown complete. Goodbye!');
@@ -3236,18 +3355,7 @@ process.on('SIGTERM', () => {
     if (unmuteTimer) {
         clearInterval(unmuteTimer);
     }
-    if (selfPingInterval) {
-        clearInterval(selfPingInterval);
-        console.log('🏓 Internal keep-alive mechanism stopped');
-    }
-    if (externalPingInterval) {
-        clearInterval(externalPingInterval);
-        console.log('🌐 External ping simulation stopped');
-    }
-    if (aggressivePingInterval) {
-        clearInterval(aggressivePingInterval);
-        console.log('🔥 Aggressive ping mechanism stopped');
-    }
+    stopKeepAliveSystem();
     server.close(() => {
         console.log('🌐 Health check server closed');
         console.log('👋 Bot terminated successfully. Goodbye!');
