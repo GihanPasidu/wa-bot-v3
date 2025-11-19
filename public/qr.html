@@ -2067,20 +2067,21 @@
             }
         }
 
-        // Helper function to format uptime
+        // Helper function to format uptime with days, hours, minutes, seconds
         function formatUptime(ms) {
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
+            const totalSeconds = Math.floor(ms / 1000);
+            const days = Math.floor(totalSeconds / (24 * 60 * 60));
+            const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+            const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+            const seconds = totalSeconds % 60;
             
-            let result = '';
-            if (days > 0) result += `${days}d `;
-            if (hours % 24 > 0) result += `${hours % 24}h `;
-            if (minutes % 60 > 0) result += `${minutes % 60}m `;
-            if (result === '' || seconds % 60 > 0) result += `${seconds % 60}s`;
+            const parts = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+            if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
+            parts.push(`${seconds}s`);
             
-            return result.trim();
+            return parts.join(' ');
         }
 
         // Enhanced error handling

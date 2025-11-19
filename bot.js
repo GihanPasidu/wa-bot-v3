@@ -85,6 +85,67 @@ let internalPingTimer = null;
 let lastKeepAliveResponse = Date.now();
 let keepAliveFailures = 0;
 
+// Session health monitoring (prevent logout after 4-5 days)
+let lastAuthRefresh = Date.now();
+let sessionHealthTimer = null;
+const AUTH_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
+const SESSION_MAX_AGE = 4 * 24 * 60 * 60 * 1000; // 4 days warning
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Session health monitoring to prevent logout after 4-5 days
+function startSessionHealthMonitoring(sock) {
+    // Clear any existing timer
+    if (sessionHealthTimer) {
+        clearInterval(sessionHealthTimer);
+    }
+    
+    // Check session health every hour
+    sessionHealthTimer = setInterval(async () => {
+        try {
+            const now = Date.now();
+            const sessionAge = now - (botStats.botConnectedTime || now);
+            const timeSinceLastRefresh = now - lastAuthRefresh;
+            
+            // Log session health
+            const sessionAgeDays = (sessionAge / (24 * 60 * 60 * 1000)).toFixed(2);
+            const hoursSinceRefresh = (timeSinceLastRefresh / (60 * 60 * 1000)).toFixed(1);
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🔒 Session Health Check');
+            console.log(`📊 Session Age: ${sessionAgeDays} days`);
+            console.log(`🔄 Last Auth Refresh: ${hoursSinceRefresh} hours ago`);
+            console.log(`✅ Connection: ${botStats.isConnected ? 'Active' : 'Inactive'}`);
+            
+            // Warn if session is getting old
+            if (sessionAge > SESSION_MAX_AGE && sessionAge < SESSION_MAX_AGE + 3600000) {
+                console.log('⚠️  WARNING: Session is over 4 days old!');
+                console.log('💡 Consider restarting bot or re-scanning QR soon');
+            }
+            
+            // Refresh auth if needed (every 12 hours)
+            if (timeSinceLastRefresh > AUTH_REFRESH_INTERVAL) {
+                console.log('🔄 Refreshing authentication...');
+                try {
+                    // Force a presence update to keep session active
+                    await sock.sendPresenceUpdate('available');
+                    lastAuthRefresh = now;
+                    console.log('✅ Auth refresh successful');
+                } catch (refreshError) {
+                    console.error('❌ Auth refresh failed:', refreshError.message);
+                    // Don't throw - let it try again next time
+                }
+            }
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        } catch (error) {
+            console.error('⚠️  Session health check error:', error.message);
+        }
+    }, 60 * 60 * 1000); // Every hour
+    
+    console.log('🔒 Session health monitoring started');
+}
+
 // Enhanced auth state management
 async function getAuthState() {
     return await useMultiFileAuthState('./auth');
@@ -1134,7 +1195,8 @@ async function startBot() {
 
     // QR handling with persistence awareness
     sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
+        const { connection, lastDisconnect, qr, isNewLogin } = update;
+        
         if (qr) {
             console.log('📱 QR Code Generated — Please scan with WhatsApp:');
             qrcode.generate(qr, { small: true });
@@ -1168,6 +1230,7 @@ async function startBot() {
                 console.error('❌ Error generating web QR code:', error.message);
             }
         }
+        
         if (connection === 'open') {
             console.log('🚀 CloudNextra Bot Successfully Connected!');
             console.log('🤖 Bot Status: Online and Ready');
@@ -1177,21 +1240,79 @@ async function startBot() {
             connectionStatus = 'connected';
             currentQRCode = null;
             botStats.sessionsCount++;
+            reconnectAttempts = 0; // Reset reconnect counter
             
             // Track bot connection time
             botStats.botConnectedTime = Date.now();
             botStats.isConnected = true;
+            lastAuthRefresh = Date.now();
+            
+            // Start session health monitoring
+            startSessionHealthMonitoring(sock);
+            
+            console.log('🔒 Session health monitoring active');
+            console.log('🔄 Auth will refresh every 12 hours');
         } else if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQRCode = null;
             
+            // Stop session health monitoring
+            if (sessionHealthTimer) {
+                clearInterval(sessionHealthTimer);
+                sessionHealthTimer = null;
+            }
+            
             // Track bot disconnection
             botStats.isConnected = false;
-            // Don't reset botConnectedTime - keep it to show last session duration
             
-            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('⚠️  Connection Lost. Attempting Reconnection:', shouldReconnect);
-            if (shouldReconnect) startBot();
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const reason = lastDisconnect?.error?.output?.payload?.message || 'Unknown';
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('⚠️  Connection Closed');
+            console.log(`📊 Status Code: ${statusCode || 'N/A'}`);
+            console.log(`📝 Reason: ${reason}`);
+            console.log(`🔄 Reconnect Attempt: ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            // Check disconnect reason
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            
+            if (statusCode === DisconnectReason.loggedOut) {
+                console.log('❌ LOGGED OUT - Session expired or manually logged out');
+                console.log('🔐 Reason: WhatsApp session is no longer valid');
+                console.log('📱 Action Required: Scan QR code again to reconnect');
+                console.log('💡 Tip: This can happen after 4-5 days without proper auth refresh');
+                // Clear auth folder to force new QR
+                try {
+                    const authPath = path.join(__dirname, 'auth');
+                    if (fs.existsSync(authPath)) {
+                        const files = fs.readdirSync(authPath);
+                        for (const file of files) {
+                            fs.unlinkSync(path.join(authPath, file));
+                        }
+                        console.log('🧹 Cleared old auth files');
+                    }
+                } catch (cleanupError) {
+                    console.error('⚠️  Error cleaning auth files:', cleanupError.message);
+                }
+                // Restart to get new QR
+                setTimeout(() => startBot(), 3000);
+            } else if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff
+                console.log(`🔄 Reconnecting in ${delay/1000} seconds... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                setTimeout(() => startBot(), delay);
+            } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                console.log('❌ Max reconnection attempts reached');
+                console.log('⏸️  Waiting 5 minutes before retrying...');
+                setTimeout(() => {
+                    reconnectAttempts = 0;
+                    startBot();
+                }, 300000); // 5 minutes
+            } else {
+                console.log('⏹️  Not reconnecting - manual intervention may be required');
+            }
         }
     });
 
