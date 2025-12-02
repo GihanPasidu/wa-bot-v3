@@ -4,7 +4,11 @@ const {
     fetchLatestBaileysVersion,
     DisconnectReason,
     downloadMediaMessage,
-    delay
+    delay,
+    makeCacheableSignalKeyStore,
+    Browsers,
+    MessageType,
+    getAggregateVotesInPollMessage
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
@@ -464,6 +468,37 @@ async function checkAndAutoUnmute(sock) {
     }
 }
 
+// Enhanced message type detection for new WhatsApp features
+function isPollMessage(msg) {
+    const m = msg.message || {};
+    return !!(m.pollCreationMessage || m.pollCreationMessageV2 || m.pollCreationMessageV3);
+}
+
+function isReactionMessage(msg) {
+    const m = msg.message || {};
+    return !!(m.reactionMessage);
+}
+
+function isChannelMessage(msg) {
+    const m = msg.message || {};
+    return msg.key?.remoteJid?.endsWith('@newsletter');
+}
+
+function isEditedMessage(msg) {
+    const m = msg.message || {};
+    return !!(m.editedMessage || m.protocolMessage?.type === 14);
+}
+
+function isDeletedMessage(msg) {
+    const m = msg.message || {};
+    return m.protocolMessage?.type === 0;
+}
+
+function isViewOnceMessage(msg) {
+    const m = msg.message || {};
+    return !!(m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension);
+}
+
 function getTextFromMessage(msg) {
     const m = msg.message || {};
     return (
@@ -475,6 +510,14 @@ function getTextFromMessage(msg) {
         (m.documentWithCaptionMessage && m.documentWithCaptionMessage.message?.documentMessage?.caption) ||
         (m.editedMessage && m.editedMessage.message?.extendedTextMessage?.text) ||
         (m.editedMessage && m.editedMessage.message?.conversation) ||
+        (m.editedMessage && m.editedMessage.message?.protocolMessage?.editedMessage?.conversation) ||
+        (m.editedMessage && m.editedMessage.message?.protocolMessage?.editedMessage?.extendedTextMessage?.text) ||
+        (m.pollCreationMessage && m.pollCreationMessage.name) ||
+        (m.pollCreationMessageV2 && m.pollCreationMessageV2.name) ||
+        (m.pollCreationMessageV3 && m.pollCreationMessageV3.name) ||
+        (m.buttonsResponseMessage && m.buttonsResponseMessage.selectedButtonId) ||
+        (m.listResponseMessage && m.listResponseMessage.singleSelectReply?.selectedRowId) ||
+        (m.templateButtonReplyMessage && m.templateButtonReplyMessage.selectedId) ||
         ''
     );
 }
@@ -1177,17 +1220,30 @@ async function startBot() {
 
     const sock = makeWASocket({
         version,
-        auth: state,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+        },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ['CloudNextra Bot', 'Desktop', '3.0.0'],
+        browser: Browsers.ubuntu('CloudNextra Bot'),
+        markOnlineOnConnect: true,
+        generateHighQualityLinkPreview: true,
         getMessage: async (key) => {
             return {
                 conversation: 'CloudNextra Bot'
             };
         },
         defaultQueryTimeoutMs: undefined,
-        syncFullHistory: false
+        syncFullHistory: false,
+        shouldSyncHistoryMessage: msg => {
+            return !!msg.message;
+        },
+        connectTimeoutMs: 60_000,
+        emitOwnEvents: false,
+        fireInitQueries: true,
+        retryRequestDelayMs: 250,
+        maxMsgRetryCount: 3
     });
 
     // Save credentials properly
@@ -1195,7 +1251,7 @@ async function startBot() {
 
     // QR handling with persistence awareness
     sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr, isNewLogin } = update;
+        const { connection, lastDisconnect, qr, isNewLogin, receivedPendingNotifications } = update;
         
         if (qr) {
             console.log('📱 QR Code Generated — Please scan with WhatsApp:');
@@ -1229,6 +1285,17 @@ async function startBot() {
             } catch (error) {
                 console.error('❌ Error generating web QR code:', error.message);
             }
+        }
+        
+        // Handle connecting state
+        if (connection === 'connecting') {
+            console.log('🔄 Connecting to WhatsApp...');
+            connectionStatus = 'connecting';
+        }
+        
+        // Handle received pending notifications (new in latest Baileys)
+        if (receivedPendingNotifications) {
+            console.log('📬 Received pending notifications from WhatsApp');
         }
         
         if (connection === 'open') {
@@ -1340,9 +1407,32 @@ async function startBot() {
                     }
                     continue;
                 }
+                
+                // Skip channel/newsletter messages (new WhatsApp feature)
+                if (isChannelMessage(msg)) {
+                    console.log('📢 Skipping channel message');
+                    continue;
+                }
+                
+                // Handle reactions (log but don't process as commands)
+                if (isReactionMessage(msg)) {
+                    console.log('❤️ Received reaction message');
+                    continue;
+                }
+                
+                // Handle deleted messages
+                if (isDeletedMessage(msg)) {
+                    console.log('🗑️ Message deleted by sender');
+                    continue;
+                }
 
                 const senderJid = (msg.key.participant || msg.key.remoteJid);
                 const body = getTextFromMessage(msg) || '';
+                
+                // Log edited messages
+                if (isEditedMessage(msg)) {
+                    console.log('✏️ Processing edited message');
+                }
             
             // Track user interactions
             botStats.usersInteracted.add(senderJid);
@@ -1595,31 +1685,6 @@ Contact a bot administrator for advanced features!
                     }
                         break;
                     }
-                    case '.status': {
-                        const statusText = `
-🔍 *Bot Debug Information*
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 *Your Status:*
-• 👤 JID: \`${senderJid}\`
-• 🏷️ Chat Type: ${isGroup ? 'Group' : 'Private'}
-• 👑 Group Admin: ${isAdmin ? '✅ Yes' : '❌ No'}
-• 🤖 Bot Admin: ${isBotAdmin ? '✅ Yes' : '❌ No'}
-
-⚙️ *Bot Configuration:*
-• 🟢 Bot Enabled: ${config.botEnabled ? 'Yes' : 'No'}
-• 👀 Auto Read: ${config.autoRead ? 'Yes' : 'No'}
-• 📵 Anti Call: ${config.antiCall ? 'Yes' : 'No'}
-
-📋 *Configured Admins:*
-${config.adminJids.map(jid => `• ${jid}`).join('\n')}
-
-${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bot admin*'}
-`;
-                        const targetJid = getSelfChatTargetJid(senderJid, from);
-                        await sock.sendMessage(targetJid, { text: statusText }, { quoted: msg });
-                        break;
-                    }
                     case '.autoread': {
                         if (!isBotAdmin) {
                             await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.autoread');
@@ -1648,6 +1713,131 @@ ${isBotAdmin ? '✅ *You have bot admin privileges*' : '⚠️ *You are not a bo
                         }, { quoted: msg });
                         break;
                     }
+                    
+                    case '.status': {
+                        if (!isBotAdmin) {
+                            await sendErrorMessage(sock, senderJid, from, 'BOT_ADMIN_REQUIRED', '.status');
+                            break;
+                        }
+                        
+                        try {
+                            // Calculate bot uptime
+                            const currentTime = Date.now();
+                            let uptimeMs = 0;
+                            let uptimeDisplay = 'Not connected';
+                            
+                            if (botStats.isConnected && botStats.botConnectedTime) {
+                                uptimeMs = currentTime - botStats.botConnectedTime;
+                                const totalSeconds = Math.floor(uptimeMs / 1000);
+                                const days = Math.floor(totalSeconds / (24 * 60 * 60));
+                                const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+                                const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+                                const seconds = totalSeconds % 60;
+                                
+                                const parts = [];
+                                if (days > 0) parts.push(`${days}d`);
+                                if (hours > 0) parts.push(`${hours}h`);
+                                if (minutes > 0) parts.push(`${minutes}m`);
+                                if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+                                
+                                uptimeDisplay = parts.join(' ');
+                            }
+                            
+                            // Calculate server uptime (process uptime)
+                            const serverUptimeMs = Date.now() - startTime;
+                            const serverSeconds = Math.floor(serverUptimeMs / 1000);
+                            const serverDays = Math.floor(serverSeconds / (24 * 60 * 60));
+                            const serverHours = Math.floor((serverSeconds % (24 * 60 * 60)) / (60 * 60));
+                            const serverMinutes = Math.floor((serverSeconds % (60 * 60)) / 60);
+                            const serverSecs = serverSeconds % 60;
+                            
+                            const serverParts = [];
+                            if (serverDays > 0) serverParts.push(`${serverDays}d`);
+                            if (serverHours > 0) serverParts.push(`${serverHours}h`);
+                            if (serverMinutes > 0) serverParts.push(`${serverMinutes}m`);
+                            if (serverSecs > 0 || serverParts.length === 0) serverParts.push(`${serverSecs}s`);
+                            
+                            const serverUptime = serverParts.join(' ');
+                            
+                            // Get memory usage
+                            const memUsage = process.memoryUsage();
+                            const memRSS = (memUsage.rss / 1024 / 1024).toFixed(2);
+                            const memHeap = (memUsage.heapUsed / 1024 / 1024).toFixed(2);
+                            const memHeapTotal = (memUsage.heapTotal / 1024 / 1024).toFixed(2);
+                            
+                            // Calculate rates
+                            const runtimeMinutes = serverUptimeMs / 1000 / 60;
+                            const msgRate = runtimeMinutes > 0 ? (botStats.messagesReceived / runtimeMinutes).toFixed(1) : '0.0';
+                            const cmdRate = runtimeMinutes > 0 ? (botStats.commandsExecuted / runtimeMinutes).toFixed(1) : '0.0';
+                            
+                            // Format last activity time
+                            const lastActivityAgo = Math.floor((currentTime - botStats.lastActivity) / 1000);
+                            const lastActivityDisplay = lastActivityAgo < 60 
+                                ? `${lastActivityAgo}s ago` 
+                                : lastActivityAgo < 3600 
+                                    ? `${Math.floor(lastActivityAgo / 60)}m ago` 
+                                    : `${Math.floor(lastActivityAgo / 3600)}h ago`;
+                            
+                            const statusText = `🤖 *Bot Admin Status Report*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ **Uptime Information:**
+• 🟢 WhatsApp Connection: ${uptimeDisplay}
+• 🔄 Server Runtime: ${serverUptime}
+• 📡 Connection Status: ${botStats.isConnected ? '✅ Connected' : '❌ Disconnected'}
+• 🕐 Last Activity: ${lastActivityDisplay}
+
+📊 **Statistics:**
+• 💬 Messages Received: ${botStats.messagesReceived.toLocaleString()}
+• ⚡ Commands Executed: ${botStats.commandsExecuted.toLocaleString()}
+• 👥 Unique Users: ${botStats.usersInteracted.size.toLocaleString()}
+• 📱 Active Groups: ${botStats.groupsActive.size.toLocaleString()}
+
+🎨 **Media & Security:**
+• 🏷️ Stickers Created: ${botStats.stickersCreated.toLocaleString()}
+• 📹 Media Processed: ${botStats.mediaProcessed.toLocaleString()}
+• 📵 Calls Blocked: ${botStats.callsBlocked.toLocaleString()}
+• 🔗 Links Blocked: ${botStats.linksBlocked.toLocaleString()}
+• ⚠️ Warnings Issued: ${botStats.warningsSent.toLocaleString()}
+
+📈 **Performance Metrics:**
+• 📊 Message Rate: ${msgRate} msg/min
+• ⚡ Command Rate: ${cmdRate} cmd/min
+• 🔄 Sessions Started: ${botStats.sessionsCount}
+• ❌ Error Count: ${botStats.errorCount}
+
+💾 **System Resources:**
+• 🧠 Memory (RSS): ${memRSS} MB
+• 📦 Heap Used: ${memHeap} MB / ${memHeapTotal} MB
+• 🔧 Node.js: ${process.version}
+• 💻 Platform: ${process.platform} (${process.arch})
+
+⚙️ **Configuration:**
+• 🟢 Bot Enabled: ${config.botEnabled ? 'Yes' : 'No'}
+• 👀 Auto Read: ${config.autoRead ? 'Yes' : 'No'}
+• 📵 Anti Call: ${config.antiCall ? 'Yes' : 'No'}
+• 🚫 Antilink Groups: ${antilinkGroups.size}
+• 🔇 Muted Groups: ${mutedGroups.size}
+• 🤐 Muted Users: ${Array.from(mutedUsers.values()).reduce((sum, map) => sum + map.size, 0)}
+
+🎯 **Environment:**
+• 🌍 Mode: ${config.nodeEnv}
+• 🔌 Port: ${config.port}
+• 🌐 Keep-Alive: ${config.keepAliveAggressive ? 'Aggressive' : 'Standard'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ *Bot is operating smoothly!*
+🔒 *Admin-Only Command* • Generated: ${new Date().toLocaleString()}`;
+                            
+                            const targetJid = getSelfChatTargetJid(senderJid, from);
+                            await sock.sendMessage(targetJid, { text: statusText }, { quoted: msg });
+                        } catch (e) {
+                            console.error('Error showing status:', e);
+                            await sendErrorMessage(sock, senderJid, from, 'COMMAND_ERROR', 'status');
+                        }
+                        break;
+                    }
+                    
                     case '.sticker': {
                         // Track media processing
                         botStats.mediaProcessed++;

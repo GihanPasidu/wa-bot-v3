@@ -26,18 +26,22 @@
 - 🚀 **99.9%+ uptime** on Render free tier
 
 ### 📦 Latest Dependencies
-- **Baileys 6.7.21** - Latest WhatsApp API support
+- **Baileys 7.0.0-rc.9** - Latest WhatsApp API support with new protocol features
 - **Axios 1.13.2** - Enhanced HTTP client
 - **Pino 9.14.0** - Advanced logging
 - **Sharp 0.34.5** - Optimized image processing
 - **Dotenv 16.4.7** - Environment configuration
 
 ### ✨ Enhanced Features
-- ✅ Support for edited messages
-- ✅ Document caption handling
-- ✅ Improved error recovery
-- ✅ Production-ready configuration
-- ✅ Environment variable support
+- ✅ **Full WhatsApp Protocol Support** - Updated for latest WhatsApp features
+- ✅ **Enhanced Message Handling** - Support for edited messages, reactions, polls
+- ✅ **Channel/Newsletter Detection** - Properly handles new WhatsApp channels
+- ✅ **Improved Connection Stability** - Better reconnection logic with exponential backoff
+- ✅ **Advanced Signal Key Store** - Cacheable signal key store for better performance
+- ✅ **Enhanced Browser Identification** - Uses Baileys' built-in browser configs
+- ✅ **Better Error Recovery** - Improved error handling and recovery mechanisms
+- ✅ **Production-Ready Configuration** - Optimized for deployment
+- ✅ **Environment Variable Support** - Full configuration via env vars
 
 ---
 
