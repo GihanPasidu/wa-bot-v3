@@ -95,7 +95,7 @@ let sessionHealthTimer = null;
 const AUTH_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 const SESSION_MAX_AGE = 4 * 24 * 60 * 60 * 1000; // 4 days warning
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
+const MAX_RECONNECT_ATTEMPTS = 10; // Increased from 5 to 10 for better resilience
 
 // Session health monitoring to prevent logout after 4-5 days
 function startSessionHealthMonitoring(sock) {
@@ -145,9 +145,9 @@ function startSessionHealthMonitoring(sock) {
         } catch (error) {
             console.error('⚠️  Session health check error:', error.message);
         }
-    }, 60 * 60 * 1000); // Every hour
+    }, 30 * 60 * 1000); // Every 30 minutes (increased from 1 hour)
     
-    console.log('🔒 Session health monitoring started');
+    console.log('🔒 Session health monitoring started (30min interval)');
 }
 
 // Enhanced auth state management
@@ -1239,11 +1239,12 @@ async function startBot() {
         shouldSyncHistoryMessage: msg => {
             return !!msg.message;
         },
-        connectTimeoutMs: 60_000,
+        connectTimeoutMs: 90_000, // Increased from 60s to 90s for better stability on Render
+        keepAliveIntervalMs: 30_000, // Send keepalive every 30 seconds
         emitOwnEvents: false,
         fireInitQueries: true,
         retryRequestDelayMs: 250,
-        maxMsgRetryCount: 3
+        maxMsgRetryCount: 5 // Increased from 3 to 5
     });
 
     // Save credentials properly
@@ -1334,16 +1335,36 @@ async function startBot() {
             
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const reason = lastDisconnect?.error?.output?.payload?.message || 'Unknown';
+            const errorMessage = lastDisconnect?.error?.message || '';
             
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             console.log('⚠️  Connection Closed');
             console.log(`📊 Status Code: ${statusCode || 'N/A'}`);
             console.log(`📝 Reason: ${reason}`);
+            console.log(`💬 Error: ${errorMessage}`);
             console.log(`🔄 Reconnect Attempt: ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
-            // Check disconnect reason
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            // Check disconnect reason - handle various disconnect scenarios
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut && 
+                                  statusCode !== DisconnectReason.badSession;
+            
+            // Handle restartRequired event (common on Render after inactivity)
+            if (statusCode === DisconnectReason.restartRequired) {
+                console.log('🔄 Restart required by WhatsApp - reconnecting immediately...');
+                reconnectAttempts = 0; // Reset counter for restart required
+                setTimeout(() => startBot(), 2000);
+                return;
+            }
+            
+            // Handle connection timeout or network issues
+            if (errorMessage.includes('timeout') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT')) {
+                console.log('⚠️  Network timeout detected - quick reconnect...');
+                const quickDelay = Math.min(5000 * (reconnectAttempts + 1), 30000);
+                reconnectAttempts++;
+                setTimeout(() => startBot(), quickDelay);
+                return;
+            }
             
             if (statusCode === DisconnectReason.loggedOut) {
                 console.log('❌ LOGGED OUT - Session expired or manually logged out');
@@ -1372,11 +1393,11 @@ async function startBot() {
                 setTimeout(() => startBot(), delay);
             } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                 console.log('❌ Max reconnection attempts reached');
-                console.log('⏸️  Waiting 5 minutes before retrying...');
+                console.log('⏸️  Waiting 2 minutes before retrying...');
                 setTimeout(() => {
                     reconnectAttempts = 0;
                     startBot();
-                }, 300000); // 5 minutes
+                }, 120000); // 2 minutes (reduced from 5)
             } else {
                 console.log('⏹️  Not reconnecting - manual intervention may be required');
             }
