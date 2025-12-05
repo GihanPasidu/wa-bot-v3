@@ -1160,20 +1160,22 @@ function startKeepAliveSystem() {
         return;
     }
     
-    console.log('🚀 Starting ultra-aggressive keep-alive system for Render...');
+    console.log('🚀 Starting HYPER-AGGRESSIVE keep-alive for Render FREE TIER...');
     console.log(`   Internal ping: Every ${config.keepAliveInterval / 1000} seconds`);
     console.log(`   External sim: Every ${(config.keepAliveInterval * 1.5) / 1000} seconds`);
+    console.log(`   🎯 Target: Prevent 15-min spin-down with 50s cold start`);
     console.log(`   Target: ${config.renderUrl || 'localhost:' + config.port}`);
     
-    // Internal self-ping (every 2 minutes by default)
+    // ULTRA-AGGRESSIVE: Internal self-ping every 1 minute (was 2 minutes)
+    // This is way below the 15-minute Render free tier spin-down threshold
     internalPingTimer = setInterval(async () => {
         await internalKeepAlive();
-    }, config.keepAliveInterval);
+    }, 60000); // Changed from config.keepAliveInterval (120000) to 60000
     
-    // External simulation (every 3 minutes)
+    // External simulation every 90 seconds (was 3 minutes)
     keepAliveTimer = setInterval(async () => {
         await externalKeepAliveSimulator();
-    }, config.keepAliveInterval * 1.5);
+    }, 90000); // Changed from config.keepAliveInterval * 1.5 (180000) to 90000
     
     // Initial ping after 30 seconds
     setTimeout(async () => {
@@ -1239,12 +1241,13 @@ async function startBot() {
         shouldSyncHistoryMessage: msg => {
             return !!msg.message;
         },
-        connectTimeoutMs: 90_000, // Increased from 60s to 90s for better stability on Render
-        keepAliveIntervalMs: 30_000, // Send keepalive every 30 seconds
+        connectTimeoutMs: 120_000, // Increased to 120s for Render cold start (50s delay)
+        keepAliveIntervalMs: 25_000, // Send keepalive every 25 seconds (more aggressive)
+        qrTimeout: 120_000, // QR timeout extended for cold starts
         emitOwnEvents: false,
         fireInitQueries: true,
-        retryRequestDelayMs: 250,
-        maxMsgRetryCount: 5 // Increased from 3 to 5
+        retryRequestDelayMs: 500, // Increased from 250ms to 500ms for cold starts
+        maxMsgRetryCount: 8 // Increased from 5 to 8 for cold start resilience
     });
 
     // Save credentials properly
@@ -1300,7 +1303,13 @@ async function startBot() {
         }
         
         if (connection === 'open') {
+            const connectionTime = Date.now();
+            const coldStartRecovery = connectionTime - startTime < 120000; // Within 2 minutes of startup
+            
             console.log('🚀 CloudNextra Bot Successfully Connected!');
+            if (coldStartRecovery) {
+                console.log('❄️  Cold Start Recovery: WhatsApp reconnected after Render spin-up');
+            }
             console.log('🤖 Bot Status: Online and Ready');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
