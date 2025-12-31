@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies with clean cache
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --loglevel=error && npm cache clean --force
 
 # Copy application files
 COPY . .

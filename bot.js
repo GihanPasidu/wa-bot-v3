@@ -225,7 +225,16 @@ async function getAuthState() {
         return authState;
     } catch (error) {
         console.error('⚠️  Error loading auth state:', error.message);
-        // If auth state is corrupted, create new one
+        // If auth state is corrupted, delete and create new one
+        console.log('🔄 Cleaning corrupted auth state...');
+        try {
+            if (fs.existsSync('./auth')) {
+                fs.rmSync('./auth', { recursive: true, force: true });
+                console.log('✅ Old auth state removed');
+            }
+        } catch (cleanupError) {
+            console.error('⚠️  Cleanup warning:', cleanupError.message);
+        }
         console.log('🔄 Creating fresh auth state...');
         return await useMultiFileAuthState('./auth');
     }
@@ -1372,12 +1381,12 @@ async function startBot() {
         shouldSyncHistoryMessage: msg => {
             return !!msg.message;
         },
-        connectTimeoutMs: 120_000, // Increased to 120s for Render cold start (50s delay)
+        connectTimeoutMs: 60_000, // Reduced to 60s for better responsiveness
         keepAliveIntervalMs: 20_000, // Send keepalive every 20 seconds (more aggressive)
-        qrTimeout: 120_000, // QR timeout extended for cold starts
+        qrTimeout: 90_000, // QR timeout 90s - optimal for linking
         emitOwnEvents: false,
         fireInitQueries: true,
-        retryRequestDelayMs: 500, // Increased from 250ms to 500ms for cold starts
+        retryRequestDelayMs: 250, // Standard delay for better responsiveness
         maxMsgRetryCount: 8, // Increased from 5 to 8 for cold start resilience
         patchMessageBeforeSending: (message) => {
             // Enhanced message patching for better compatibility
