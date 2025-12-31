@@ -4,7 +4,7 @@
 
 ![CloudNextra Bot](https://img.shields.io/badge/CloudNextra-Bot%20v3.0.0-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Baileys](https://img.shields.io/badge/Baileys-6.7.21-blue?style=for-the-badge)
+![Baileys](https://img.shields.io/badge/Baileys-7.0.0--rc.9-blue?style=for-the-badge)
 ![Render](https://img.shields.io/badge/Render-Ready-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
@@ -25,18 +25,19 @@
 - 🔄 **Auto-recovery** on failures
 - 🚀 **99.9%+ uptime** on Render free tier
 
-### 📦 Latest Dependencies
+### 📦 Latest Dependencies (January 2026)
 - **Baileys 7.0.0-rc.9** - Latest WhatsApp API support with new protocol features
 - **Axios 1.13.2** - Enhanced HTTP client
-- **Pino 9.14.0** - Advanced logging
+- **Pino 10.1.0** - Advanced logging (latest stable)
 - **Sharp 0.34.5** - Optimized image processing
-- **Dotenv 16.4.7** - Environment configuration
+- **Dotenv 16.6.1** - Environment configuration
 
-### ✨ Enhanced Features
+### ✨ Enhanced Features (January 2026 Update)
 - ✅ **Full WhatsApp Protocol Support** - Updated for latest WhatsApp features
-- ✅ **Enhanced Message Handling** - Support for edited messages, reactions, polls
+- ✅ **Enhanced Message Handling** - Support for ephemeral, edited messages, reactions, polls
 - ✅ **Channel/Newsletter Detection** - Properly handles new WhatsApp channels
-- ✅ **Improved Connection Stability** - Better reconnection logic with exponential backoff
+- ✅ **Improved Media Downloads** - New streaming-based download system
+- ✅ **View-Once & Disappearing Messages** - Full support for ephemeral content
 - ✅ **Advanced Signal Key Store** - Cacheable signal key store for better performance
 - ✅ **Enhanced Browser Identification** - Uses Baileys' built-in browser configs
 - ✅ **Better Error Recovery** - Improved error handling and recovery mechanisms

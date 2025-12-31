@@ -4,11 +4,17 @@ const {
     fetchLatestBaileysVersion,
     DisconnectReason,
     downloadMediaMessage,
+    downloadContentFromMessage,
     delay,
     makeCacheableSignalKeyStore,
     Browsers,
     MessageType,
-    getAggregateVotesInPollMessage
+    getAggregateVotesInPollMessage,
+    jidNormalizedUser,
+    areJidsSameUser,
+    proto,
+    generateWAMessageFromContent,
+    prepareWAMessageMedia
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
@@ -96,6 +102,8 @@ const AUTH_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
 const SESSION_MAX_AGE = 4 * 24 * 60 * 60 * 1000; // 4 days warning
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10; // Increased from 5 to 10 for better resilience
+let lastMessageReceived = Date.now(); // Track last message activity
+let connectionValidationTimer = null;
 
 // Session health monitoring to prevent logout after 4-5 days
 function startSessionHealthMonitoring(sock) {
@@ -104,22 +112,44 @@ function startSessionHealthMonitoring(sock) {
         clearInterval(sessionHealthTimer);
     }
     
-    // Check session health every hour
+    // Check session health every 15 minutes (more frequent)
     sessionHealthTimer = setInterval(async () => {
         try {
             const now = Date.now();
             const sessionAge = now - (botStats.botConnectedTime || now);
             const timeSinceLastRefresh = now - lastAuthRefresh;
+            const timeSinceLastMessage = now - lastMessageReceived;
             
             // Log session health
             const sessionAgeDays = (sessionAge / (24 * 60 * 60 * 1000)).toFixed(2);
             const hoursSinceRefresh = (timeSinceLastRefresh / (60 * 60 * 1000)).toFixed(1);
+            const minutesSinceMessage = (timeSinceLastMessage / (60 * 1000)).toFixed(1);
             
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             console.log('🔒 Session Health Check');
             console.log(`📊 Session Age: ${sessionAgeDays} days`);
             console.log(`🔄 Last Auth Refresh: ${hoursSinceRefresh} hours ago`);
+            console.log(`📨 Last Message: ${minutesSinceMessage} minutes ago`);
             console.log(`✅ Connection: ${botStats.isConnected ? 'Active' : 'Inactive'}`);
+            
+            // Detect silent disconnection (no messages for over 2 hours in active bot)
+            if (timeSinceLastMessage > 2 * 60 * 60 * 1000 && botStats.messagesReceived > 0) {
+                console.log('⚠️  WARNING: No messages received for 2+ hours!');
+                console.log('🔍 Possible silent disconnection detected');
+                console.log('🔄 Sending presence update to validate connection...');
+                try {
+                    await sock.sendPresenceUpdate('available');
+                    console.log('✅ Connection validation successful');
+                } catch (validationError) {
+                    console.error('❌ Connection validation FAILED - reconnecting...');
+                    console.error('Error:', validationError.message);
+                    // Force reconnection
+                    if (sock.end) {
+                        sock.end(new Error('Silent disconnection detected'));
+                    }
+                    return;
+                }
+            }
             
             // Warn if session is getting old
             if (sessionAge > SESSION_MAX_AGE && sessionAge < SESSION_MAX_AGE + 3600000) {
@@ -127,17 +157,27 @@ function startSessionHealthMonitoring(sock) {
                 console.log('💡 Consider restarting bot or re-scanning QR soon');
             }
             
-            // Refresh auth if needed (every 12 hours)
-            if (timeSinceLastRefresh > AUTH_REFRESH_INTERVAL) {
+            // Refresh auth more frequently (every 8 hours instead of 12)
+            if (timeSinceLastRefresh > 8 * 60 * 60 * 1000) {
                 console.log('🔄 Refreshing authentication...');
                 try {
                     // Force a presence update to keep session active
                     await sock.sendPresenceUpdate('available');
+                    // Also send a ping to WhatsApp servers
+                    await sock.query({
+                        tag: 'iq',
+                        attrs: {
+                            to: '@s.whatsapp.net',
+                            type: 'get',
+                            xmlns: 'w:p',
+                        },
+                        content: [{ tag: 'ping', attrs: {} }]
+                    }).catch(() => {}); // Ignore ping errors
                     lastAuthRefresh = now;
                     console.log('✅ Auth refresh successful');
                 } catch (refreshError) {
                     console.error('❌ Auth refresh failed:', refreshError.message);
-                    // Don't throw - let it try again next time
+                    // Try to reconnect if refresh fails multiple times
                 }
             }
             
@@ -145,14 +185,50 @@ function startSessionHealthMonitoring(sock) {
         } catch (error) {
             console.error('⚠️  Session health check error:', error.message);
         }
-    }, 30 * 60 * 1000); // Every 30 minutes (increased from 1 hour)
+    }, 15 * 60 * 1000); // Every 15 minutes (more frequent than before)
     
-    console.log('🔒 Session health monitoring started (30min interval)');
+    console.log('🔒 Session health monitoring started (15min interval)');
 }
 
-// Enhanced auth state management
+// Start connection validation (detect silent disconnects)
+function startConnectionValidation(sock) {
+    // Clear any existing timer
+    if (connectionValidationTimer) {
+        clearInterval(connectionValidationTimer);
+    }
+    
+    // Validate connection every 5 minutes
+    connectionValidationTimer = setInterval(async () => {
+        try {
+            if (!botStats.isConnected) return;
+            
+            // Send presence update as a lightweight connection test
+            await sock.sendPresenceUpdate('available');
+            console.log('🔍 Connection validation: OK');
+        } catch (error) {
+            console.error('❌ Connection validation failed:', error.message);
+            console.log('🔄 Attempting to reconnect...');
+            if (sock.end) {
+                sock.end(new Error('Connection validation failed'));
+            }
+        }
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
+    console.log('🔍 Connection validation started (5min interval)');
+}
+
+// Enhanced auth state management with better error handling
 async function getAuthState() {
-    return await useMultiFileAuthState('./auth');
+    try {
+        const authState = await useMultiFileAuthState('./auth');
+        console.log('✅ Auth state loaded successfully');
+        return authState;
+    } catch (error) {
+        console.error('⚠️  Error loading auth state:', error.message);
+        // If auth state is corrupted, create new one
+        console.log('🔄 Creating fresh auth state...');
+        return await useMultiFileAuthState('./auth');
+    }
 }
 
 // Warning system functions
@@ -468,6 +544,32 @@ async function checkAndAutoUnmute(sock) {
     }
 }
 
+// Enhanced media download helper using downloadContentFromMessage (newer method)
+async function downloadMedia(msg, msgType) {
+    try {
+        const stream = await downloadContentFromMessage(msg, msgType);
+        const buffer = [];
+        for await (const chunk of stream) {
+            buffer.push(chunk);
+        }
+        return Buffer.concat(buffer);
+    } catch (error) {
+        console.error('Error downloading media with downloadContentFromMessage, falling back to downloadMediaMessage:', error);
+        // Fallback to old method if new one fails
+        try {
+            return await downloadMediaMessage(
+                { message: { [msgType + 'Message']: msg } },
+                'buffer',
+                {},
+                { logger: pino({ level: 'silent' }) }
+            );
+        } catch (fallbackError) {
+            console.error('Fallback download also failed:', fallbackError);
+            throw fallbackError;
+        }
+    }
+}
+
 // Enhanced message type detection for new WhatsApp features
 function isPollMessage(msg) {
     const m = msg.message || {};
@@ -499,8 +601,32 @@ function isViewOnceMessage(msg) {
     return !!(m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension);
 }
 
+function isEphemeralMessage(msg) {
+    const m = msg.message || {};
+    return !!(m.ephemeralMessage || msg.message?.disappearingMode);
+}
+
+function isPinMessage(msg) {
+    const m = msg.message || {};
+    return m.protocolMessage?.type === 5; // PINNED_MESSAGE
+}
+
+function isUnpinMessage(msg) {
+    const m = msg.message || {};
+    return m.protocolMessage?.type === 6; // UNPINNED_MESSAGE
+}
+
 function getTextFromMessage(msg) {
     const m = msg.message || {};
+    // Handle ephemeral messages
+    if (m.ephemeralMessage) {
+        return getTextFromMessage({ message: m.ephemeralMessage.message });
+    }
+    // Handle view-once messages
+    if (m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension) {
+        const viewOnceMsg = m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension;
+        return getTextFromMessage({ message: viewOnceMsg.message });
+    }
     return (
         m.conversation ||
         (m.extendedTextMessage && m.extendedTextMessage.text) ||
@@ -1228,10 +1354,15 @@ async function startBot() {
         },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu('CloudNextra Bot'),
+        browser: ['CloudNextra Bot', 'Chrome', '3.0.0'],
         markOnlineOnConnect: true,
         generateHighQualityLinkPreview: true,
         getMessage: async (key) => {
+            // Enhanced message retrieval with better history support
+            if (store) {
+                const msg = await store.loadMessage(key.remoteJid, key.id);
+                return msg?.message || undefined;
+            }
             return {
                 conversation: 'CloudNextra Bot'
             };
@@ -1242,16 +1373,64 @@ async function startBot() {
             return !!msg.message;
         },
         connectTimeoutMs: 120_000, // Increased to 120s for Render cold start (50s delay)
-        keepAliveIntervalMs: 25_000, // Send keepalive every 25 seconds (more aggressive)
+        keepAliveIntervalMs: 20_000, // Send keepalive every 20 seconds (more aggressive)
         qrTimeout: 120_000, // QR timeout extended for cold starts
         emitOwnEvents: false,
         fireInitQueries: true,
         retryRequestDelayMs: 500, // Increased from 250ms to 500ms for cold starts
-        maxMsgRetryCount: 8 // Increased from 5 to 8 for cold start resilience
+        maxMsgRetryCount: 8, // Increased from 5 to 8 for cold start resilience
+        patchMessageBeforeSending: (message) => {
+            // Enhanced message patching for better compatibility
+            const requiresPatch = !!(
+                message.buttonsMessage ||
+                message.templateMessage ||
+                message.listMessage
+            );
+            if (requiresPatch) {
+                message = {
+                    viewOnceMessage: {
+                        message: {
+                            messageContextInfo: {
+                                deviceListMetadataVersion: 2,
+                                deviceListMetadata: {}
+                            },
+                            ...message
+                        }
+                    }
+                };
+            }
+            return message;
+        }
     });
 
-    // Save credentials properly
-    sock.ev.on('creds.update', saveCreds);
+    // Enhanced credentials saving with retry logic
+    let saveCredsRetries = 0;
+    const maxSaveRetries = 3;
+    
+    sock.ev.on('creds.update', async () => {
+        try {
+            await saveCreds();
+            saveCredsRetries = 0; // Reset on success
+        } catch (error) {
+            console.error('❌ Error saving credentials:', error.message);
+            if (saveCredsRetries < maxSaveRetries) {
+                saveCredsRetries++;
+                console.log(`🔄 Retrying credential save (${saveCredsRetries}/${maxSaveRetries})...`);
+                setTimeout(async () => {
+                    try {
+                        await saveCreds();
+                        console.log('✅ Credentials saved on retry');
+                        saveCredsRetries = 0;
+                    } catch (retryError) {
+                        console.error('❌ Retry failed:', retryError.message);
+                    }
+                }, 1000);
+            } else {
+                console.error('❌ Failed to save credentials after multiple attempts');
+                console.error('⚠️  Bot may disconnect on next restart!');
+            }
+        }
+    });
 
     // QR handling with persistence awareness
     sock.ev.on('connection.update', async (update) => {
@@ -1323,12 +1502,17 @@ async function startBot() {
             botStats.botConnectedTime = Date.now();
             botStats.isConnected = true;
             lastAuthRefresh = Date.now();
+            lastMessageReceived = Date.now(); // Reset message timer
             
             // Start session health monitoring
             startSessionHealthMonitoring(sock);
             
-            console.log('🔒 Session health monitoring active');
-            console.log('🔄 Auth will refresh every 12 hours');
+            // Start connection validation
+            startConnectionValidation(sock);
+            
+            console.log('🔒 Session health monitoring active (15min interval)');
+            console.log('🔍 Connection validation active (5min interval)');
+            console.log('🔄 Auth will refresh every 8 hours');
         } else if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQRCode = null;
@@ -1337,6 +1521,12 @@ async function startBot() {
             if (sessionHealthTimer) {
                 clearInterval(sessionHealthTimer);
                 sessionHealthTimer = null;
+            }
+            
+            // Stop connection validation
+            if (connectionValidationTimer) {
+                clearInterval(connectionValidationTimer);
+                connectionValidationTimer = null;
             }
             
             // Track bot disconnection
@@ -1426,9 +1616,10 @@ async function startBot() {
                 const from = msg.key.remoteJid;
                 if (!from) continue;
                 
-                // Track message statistics
+                // Track message statistics and last message time
                 botStats.messagesReceived++;
                 botStats.lastActivity = Date.now();
+                lastMessageReceived = Date.now(); // Update last message timestamp
                 
                 // Handle status updates: mark as read if autoRead, then skip further processing
                 if (from === 'status@broadcast') {
@@ -1922,12 +2113,23 @@ Contact a bot administrator for advanced features!
                         }
                         
                         try {
-                            const buffer = await downloadMediaMessage(
-                                mediaMsg,
-                                'buffer',
-                                {},
-                                { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
-                            );
+                            // Determine media type from message
+                            const m = mediaMsg.message || {};
+                            let msgType = 'image';
+                            let mediaContent = null;
+                            
+                            if (m.imageMessage) {
+                                msgType = 'image';
+                                mediaContent = m.imageMessage;
+                            } else if (m.videoMessage) {
+                                msgType = 'video';
+                                mediaContent = m.videoMessage;
+                            } else if (m.stickerMessage) {
+                                msgType = 'sticker';
+                                mediaContent = m.stickerMessage;
+                            }
+                            
+                            const buffer = await downloadMedia(mediaContent, msgType);
                             
                             let stickerBuffer;
                             let successMessage;
@@ -1972,12 +2174,9 @@ Contact a bot administrator for advanced features!
                             break;
                         }
                         try {
-                            const buffer = await downloadMediaMessage(
-                                stickerMsg,
-                                'buffer',
-                                {},
-                                { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
-                            );
+                            const m = stickerMsg.message || {};
+                            const stickerContent = m.stickerMessage;
+                            const buffer = await downloadMedia(stickerContent, 'sticker');
                             const jpeg = await convertStickerToImage(buffer);
                             await sock.sendMessage(from, { 
                                 image: jpeg,
@@ -2006,12 +2205,9 @@ Contact a bot administrator for advanced features!
                             break;
                         }
                         try {
-                            const buffer = await downloadMediaMessage(
-                                stickerMsg,
-                                'buffer',
-                                {},
-                                { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
-                            );
+                            const m = stickerMsg.message || {};
+                            const stickerContent = m.stickerMessage;
+                            const buffer = await downloadMedia(stickerContent, 'sticker');
                             const gifBuffer = await convertStickerToGif(buffer);
                             await sock.sendMessage(from, { 
                                 video: gifBuffer,
