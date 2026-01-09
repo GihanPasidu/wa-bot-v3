@@ -1363,7 +1363,7 @@ async function startBot() {
         },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ['CloudNextra Bot', 'Chrome', '3.0.0'],
+        browser: Browsers.ubuntu('Chrome'),
         markOnlineOnConnect: true,
         generateHighQualityLinkPreview: true,
         getMessage: async (key) => {
@@ -1376,18 +1376,18 @@ async function startBot() {
                 conversation: 'CloudNextra Bot'
             };
         },
-        defaultQueryTimeoutMs: undefined,
+        defaultQueryTimeoutMs: 60_000,
         syncFullHistory: false,
         shouldSyncHistoryMessage: msg => {
             return !!msg.message;
         },
-        connectTimeoutMs: 60_000, // Reduced to 60s for better responsiveness
-        keepAliveIntervalMs: 20_000, // Send keepalive every 20 seconds (more aggressive)
-        qrTimeout: 90_000, // QR timeout 90s - optimal for linking
+        connectTimeoutMs: 60_000,
+        keepAliveIntervalMs: 30_000,
+        qrTimeout: 60_000,
         emitOwnEvents: false,
         fireInitQueries: true,
-        retryRequestDelayMs: 250, // Standard delay for better responsiveness
-        maxMsgRetryCount: 8, // Increased from 5 to 8 for cold start resilience
+        retryRequestDelayMs: 250,
+        maxMsgRetryCount: 5,
         patchMessageBeforeSending: (message) => {
             // Enhanced message patching for better compatibility
             const requiresPatch = !!(
@@ -1449,7 +1449,8 @@ async function startBot() {
             console.log('📱 QR Code Generated — Please scan with WhatsApp:');
             qrcode.generate(qr, { small: true });
             console.log('\n📱 Steps: Open WhatsApp → Settings → Linked Devices → Link a Device');
-            console.log('⏱️  QR Code expires in 60 seconds...');
+            console.log('⏱️  QR Code expires in 60 seconds... (Scan quickly!)');
+            console.log('💡 Tip: Have your phone ready before scanning for faster linking');
             
             // Show QR webpage link prominently
             const baseURL = process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL 

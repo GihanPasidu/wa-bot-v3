@@ -4,7 +4,7 @@
 
 ![CloudNextra Bot](https://img.shields.io/badge/CloudNextra-Bot%20v3.0.0-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Baileys](https://img.shields.io/badge/Baileys-7.0.0--rc.9-blue?style=for-the-badge)
+![Baileys](https://img.shields.io/badge/Baileys-6.7.9-blue?style=for-the-badge)
 ![Render](https://img.shields.io/badge/Render-Ready-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
@@ -26,7 +26,7 @@
 - 🚀 **99.9%+ uptime** on Render free tier
 
 ### 📦 Latest Dependencies (January 2026)
-- **Baileys 7.0.0-rc.9** - Latest WhatsApp API support with new protocol features
+- **Baileys 6.7.9** - Stable WhatsApp API support with latest protocol compatibility
 - **Axios 1.13.2** - Enhanced HTTP client
 - **Pino 10.1.0** - Advanced logging (latest stable)
 - **Sharp 0.34.5** - Optimized image processing
