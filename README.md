@@ -4,7 +4,7 @@
 
 ![CloudNextra Bot](https://img.shields.io/badge/CloudNextra-Bot%20v3.0.0-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Baileys](https://img.shields.io/badge/Baileys-6.8.0-blue?style=for-the-badge)
+![Baileys](https://img.shields.io/badge/Baileys-6.7.9-blue?style=for-the-badge)
 ![Render](https://img.shields.io/badge/Render-Ready-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
@@ -25,24 +25,23 @@
 - 🔄 **Auto-recovery** on failures
 - 🚀 **99.9%+ uptime** on Render free tier
 
-### 📦 Latest Dependencies (February 2026)
-- **Baileys 6.8.0** - Latest WhatsApp API with enhanced stability and protocol updates
-- **Axios 1.14.0** - Enhanced HTTP client with improved performance
-- **Pino 10.2.0** - Advanced logging (latest stable)
-- **Sharp 0.34.6** - Optimized image processing with security updates
-- **Dotenv 16.7.0** - Environment configuration
+### 📦 Latest Dependencies (January 2026)
+- **Baileys 6.7.9** - Stable WhatsApp API support with latest protocol compatibility
+- **Axios 1.13.2** - Enhanced HTTP client
+- **Pino 10.1.0** - Advanced logging (latest stable)
+- **Sharp 0.34.5** - Optimized image processing
+- **Dotenv 16.6.1** - Environment configuration
 
-### ✨ Enhanced Features (February 2026 Update)
-- ✅ **Latest WhatsApp Protocol** - Updated for February 2026 WhatsApp features
+### ✨ Enhanced Features (January 2026 Update)
+- ✅ **Full WhatsApp Protocol Support** - Updated for latest WhatsApp features
 - ✅ **Enhanced Message Handling** - Support for ephemeral, edited messages, reactions, polls
-- ✅ **Channel/Newsletter Support** - Full compatibility with WhatsApp channels
-- ✅ **Improved Media Downloads** - Enhanced streaming-based download system
+- ✅ **Channel/Newsletter Detection** - Properly handles new WhatsApp channels
+- ✅ **Improved Media Downloads** - New streaming-based download system
 - ✅ **View-Once & Disappearing Messages** - Full support for ephemeral content
-- ✅ **Advanced Signal Key Store** - Optimized cacheable signal key store
-- ✅ **Enhanced Browser Identification** - Latest browser configs for better compatibility
-- ✅ **Superior Error Recovery** - Enhanced error handling and auto-recovery
-- ✅ **Connection Resilience** - Improved reconnection logic and session persistence
-- ✅ **Production-Ready Configuration** - Optimized for maximum uptime
+- ✅ **Advanced Signal Key Store** - Cacheable signal key store for better performance
+- ✅ **Enhanced Browser Identification** - Uses Baileys' built-in browser configs
+- ✅ **Better Error Recovery** - Improved error handling and recovery mechanisms
+- ✅ **Production-Ready Configuration** - Optimized for deployment
 - ✅ **Environment Variable Support** - Full configuration via env vars
 
 ---

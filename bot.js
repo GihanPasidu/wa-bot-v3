@@ -32,11 +32,6 @@ const ffprobeStatic = require('ffprobe-static');
 // Load environment variables (for production deployment)
 require('dotenv').config();
 
-// ==================== CloudNextra Bot v3.0.0 ====================
-// Updated: February 2026 - Enhanced WhatsApp Protocol Support
-// Baileys 6.8.0+ - Latest features and improved stability
-// =================================================================
-
 // Bot configuration with environment variable support
 const config = {
     autoRead: process.env.AUTO_READ === 'true' || false,
@@ -1387,19 +1382,12 @@ async function startBot() {
             return !!msg.message;
         },
         connectTimeoutMs: 60_000,
-        keepAliveIntervalMs: 25_000, // Enhanced: More frequent keep-alive
+        keepAliveIntervalMs: 30_000,
         qrTimeout: 60_000,
         emitOwnEvents: false,
         fireInitQueries: true,
         retryRequestDelayMs: 250,
         maxMsgRetryCount: 5,
-        shouldIgnoreJid: jid => {
-            // Enhanced: Ignore status broadcasts and channels properly
-            return jid === 'status@broadcast' || jid?.includes('@newsletter');
-        },
-        msgRetryCounterCache: new Map(), // Enhanced: Better message retry handling
-        linkPreviewImageThumbnailWidth: 192,
-        transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 }, // Enhanced reliability
         patchMessageBeforeSending: (message) => {
             // Enhanced message patching for better compatibility
             const requiresPatch = !!(
@@ -1578,36 +1566,9 @@ async function startBot() {
                 return;
             }
             
-            // Handle connection replaced (user logged in elsewhere)
-            if (statusCode === DisconnectReason.connectionReplaced) {
-                console.log('⚠️  Connection replaced - another device linked');
-                console.log('📱 This session was disconnected by a new login');
-                console.log('🔄 Restarting to generate new QR code...');
-                setTimeout(() => startBot(), 3000);
-                return;
-            }
-            
-            // Handle multidevice mismatch
-            if (statusCode === DisconnectReason.multideviceMismatch) {
-                console.log('⚠️  Multi-device mismatch detected');
-                console.log('🔐 Clearing auth state and restarting...');
-                try {
-                    const authPath = path.join(__dirname, 'auth');
-                    if (fs.existsSync(authPath)) {
-                        fs.rmSync(authPath, { recursive: true, force: true });
-                        console.log('✅ Auth state cleared');
-                    }
-                } catch (cleanupError) {
-                    console.error('⚠️  Error cleaning auth:', cleanupError.message);
-                }
-                setTimeout(() => startBot(), 3000);
-                return;
-            }
-            
             // Handle connection timeout or network issues
-            if (errorMessage.includes('timeout') || errorMessage.includes('ECONNRESET') || 
-                errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ENOTFOUND')) {
-                console.log('⚠️  Network issue detected - quick reconnect...');
+            if (errorMessage.includes('timeout') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT')) {
+                console.log('⚠️  Network timeout detected - quick reconnect...');
                 const quickDelay = Math.min(5000 * (reconnectAttempts + 1), 30000);
                 reconnectAttempts++;
                 setTimeout(() => startBot(), quickDelay);

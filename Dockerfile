@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 
-# Update packages and install security updates (February 2026)
+# Update packages and install security updates
 RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
