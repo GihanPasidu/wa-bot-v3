@@ -1,10 +1,10 @@
 # Fix WhatsApp Linking Issues - Quick Reset Script
 # Run this if you get "couldn't link device try again later" error
-# Updated for WhatsApp January 2026 Protocol
+# Updated for WhatsApp February 2026 Protocol
 
 Write-Host ""
 Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "🔧 Fix WhatsApp Linking Issues (January 2026 Update)" -ForegroundColor Yellow
+Write-Host "🔧 Fix WhatsApp Linking Issues (February 2026 Update)" -ForegroundColor Yellow
 Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "📋 This script will:" -ForegroundColor White
